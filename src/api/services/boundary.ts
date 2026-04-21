@@ -142,7 +142,14 @@ export const boundaryService = {
     }
   },
 
-  // Create a boundary entity (just the entity, not the relationship)
+  // Create a boundary entity (just the entity, not the relationship).
+  // If the backend reports "already exists", verify the entity truly lives
+  // in the DB before swallowing — the boundary-service occasionally returns
+  // a false-positive "already exists" when a prior request is still sitting
+  // in its cache but the row never actually landed (also seen right after
+  // a direct DB cleanup, before the service's in-memory dedup cache times
+  // out). Blanket-swallowing that error made Phase 2 claim success while
+  // creating nothing.
   async createBoundaryEntity(tenantId: string, code: string): Promise<boolean> {
     try {
       await apiClient.post(ENDPOINTS.BOUNDARY_CREATE, {
@@ -155,16 +162,36 @@ export const boundaryService = {
       });
       return true;
     } catch (error) {
-      // Check if already exists (which is OK)
       const errorMsg = error instanceof Error ? error.message : String(error);
       if (errorMsg.toLowerCase().includes('already exists') || errorMsg.includes('DUPLICATE')) {
-        return true;
+        const found = await this.boundaryEntityExists(tenantId, code);
+        if (found) return true;
+        throw new Error(
+          `Backend reported boundary entity ${code} already exists, but a search returned nothing. ` +
+          `Retry may be needed, or a stale cache/Kafka state is masking the real error.`
+        );
       }
       throw error;
     }
   },
 
-  // Create a boundary relationship (parent-child link in hierarchy)
+  async boundaryEntityExists(tenantId: string, code: string): Promise<boolean> {
+    try {
+      const response = await apiClient.post(
+        `${ENDPOINTS.BOUNDARY_SEARCH}?tenantId=${encodeURIComponent(tenantId)}&codes=${encodeURIComponent(code)}`,
+        { RequestInfo: apiClient.buildRequestInfo() },
+      );
+      return (response.Boundary?.length ?? 0) > 0;
+    } catch {
+      return false;
+    }
+  },
+
+  // Create a boundary relationship (parent-child link in hierarchy).
+  // Same verify-before-swallow pattern as createBoundaryEntity — the
+  // backend sometimes returns "already exists" for relationships that
+  // never persisted. This was the root cause of Phase 2 silently
+  // reporting "4 boundaries created" with 0 relationships in the DB.
   async createBoundaryRelationship(
     tenantId: string,
     hierarchyType: string,
@@ -190,12 +217,30 @@ export const boundaryService = {
       await apiClient.post(ENDPOINTS.BOUNDARY_RELATIONSHIP_CREATE, payload);
       return true;
     } catch (error) {
-      // Check if already exists (which is OK)
       const errorMsg = error instanceof Error ? error.message : String(error);
       if (errorMsg.toLowerCase().includes('already exists') || errorMsg.includes('DUPLICATE')) {
-        return true;
+        const found = await this.boundaryRelationshipExists(tenantId, hierarchyType, code);
+        if (found) return true;
+        throw new Error(
+          `Backend reported relationship ${code} (${hierarchyType}) already exists, ` +
+          `but a search returned nothing. Likely a stale cache — try again in a few seconds ` +
+          `or clean up and re-run.`
+        );
       }
       throw error;
+    }
+  },
+
+  async boundaryRelationshipExists(tenantId: string, hierarchyType: string, code: string): Promise<boolean> {
+    try {
+      const qs = new URLSearchParams({ tenantId, hierarchyType, codes: code, includeChildren: 'false' });
+      const response = await apiClient.post(
+        `${ENDPOINTS.BOUNDARY_RELATIONSHIP_SEARCH}?${qs.toString()}`,
+        { RequestInfo: apiClient.buildRequestInfo() },
+      );
+      return (response.TenantBoundary?.length ?? 0) > 0;
+    } catch {
+      return false;
     }
   },
 
