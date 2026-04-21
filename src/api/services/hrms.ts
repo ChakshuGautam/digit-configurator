@@ -145,7 +145,12 @@ export const hrmsService = {
       jurisdictions: data.jurisdictions.map((j) => ({
         boundary: j.boundary,
         boundaryType: j.boundaryType,
+        // HRMS DTO names this field `hierarchy`, not `hierarchyType` — the MDMS
+        // side uses `hierarchyType` elsewhere, so the naming is inconsistent
+        // across DIGIT. Send both so either spelling works.
+        hierarchy: j.hierarchyType,
         hierarchyType: j.hierarchyType,
+        tenantId: data.tenantId,
         isActive: true,
       })),
       assignments: [
