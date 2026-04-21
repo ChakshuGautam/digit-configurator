@@ -29,6 +29,7 @@ import {
   BoundaryHierarchyList, BoundaryHierarchyShow,
   AdvancedPage,
 } from '@/resources';
+import PgrDashboard from './pages/PgrDashboard';
 import { getGenericMdmsResources, getDataProvider, getAuthProvider, configureDigitClient, digitClient, resetProviders, i18nProvider } from '@/providers/bridge';
 import { ThemeProvider } from '@/providers/ThemeProvider';
 import HelpModal from './components/ui/HelpModal';
@@ -119,6 +120,7 @@ function ManagementAdmin() {
         {/* Custom routes */}
         <CustomRoutes>
           <Route path="/advanced" element={<AdvancedPage />} />
+          <Route path="/pgr-dashboard" element={<PgrDashboard />} />
         </CustomRoutes>
       </CoreAdminUI>
     </CoreAdminContext>
@@ -385,7 +387,7 @@ function App() {
   return (
     <AppContext.Provider value={contextValue}>
       <ThemeProvider>
-      <BrowserRouter>
+      <BrowserRouter basename="/configurator">
         <PageViewTracker />
         <a href="#main-content" className="skip-link">Skip to main content</a>
         <Routes>
