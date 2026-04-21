@@ -35,7 +35,7 @@ import { ThemeProvider } from '@/providers/ThemeProvider';
 import HelpModal from './components/ui/HelpModal';
 import UndoToast from './components/ui/UndoToast';
 import { Toaster } from './components/ui/toaster';
-import { apiClient } from './api';
+import { apiClient, getApiBaseUrl } from './api';
 import { identifyUser, clearUser, trackEvent } from './lib/telemetry';
 import PageViewTracker from './components/PageViewTracker';
 import './App.css';
@@ -152,7 +152,7 @@ function restoreApiClientFromStorage(): { isAuthenticated: boolean; user: AppSta
       apiClient.setTenantId(parsed.tenant);
 
       // Also configure the shared digitClient from the bridge
-      const restoredEnv = parsed.environment || 'https://api.egov.theflywheel.in';
+      const restoredEnv = parsed.environment || getApiBaseUrl();
       const restoredTenant = parsed.tenant || 'statea';
       configureDigitClient(restoredEnv, parsed.authToken, {
         id: parsed.user.id ?? 0,
@@ -195,8 +195,8 @@ function App() {
     return {
       isAuthenticated: false,
       user: null,
-      environment: 'https://api.egov.theflywheel.in',
-      tenant: 'statea',
+      environment: getApiBaseUrl(),
+      tenant: 'ke',
       mode: 'onboarding',
       currentPhase: 1,
       completedPhases: [],

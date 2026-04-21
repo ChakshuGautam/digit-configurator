@@ -29,7 +29,7 @@ export default function CompletePage() {
             <PartyPopper className="w-8 h-8 sm:w-12 sm:h-12 text-primary-foreground" />
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-condensed font-bold text-foreground mb-2">CRS Setup Complete!</h1>
+          <h1 className="text-2xl sm:text-3xl font-condensed font-bold text-foreground mb-2">Setup Complete!</h1>
           <p className="text-base sm:text-lg text-muted-foreground mb-6 sm:mb-8">All phases completed successfully</p>
 
           {/* Progress summary - DIGIT style */}
@@ -98,10 +98,10 @@ export default function CompletePage() {
         <div className="p-4 bg-success/10 border border-success/20 rounded mb-6 sm:mb-8 text-left">
           <div className="flex items-center gap-2 text-success mb-2">
             <Check className="w-5 h-5" />
-            <strong className="text-sm font-condensed">Your CRS/PGR system is ready!</strong>
+            <strong className="text-sm font-condensed">Your complaints management system is ready!</strong>
           </div>
           <ul className="text-xs sm:text-sm space-y-1 sm:space-y-2 text-foreground">
-            <li>• Employees can login to CRS application at <strong className="break-all text-primary">{state.environment.replace('https://', '')}</strong></li>
+            <li>• Employees can login at <strong className="break-all text-primary">{state.environment.replace('https://', '')}</strong></li>
             <li>• Access complaint management based on their roles</li>
             <li>• Handle complaints in their assigned jurisdictions</li>
           </ul>

@@ -3,12 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../App';
 import { Eye, EyeOff, Loader2, Database, AlertCircle, HelpCircle, Rocket, Settings } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DigitCard, DigitCardHeader, DigitCardSubHeader } from '@/components/digit/DigitCard';
 import { LabelFieldPair, CardLabel, Field } from '@/components/digit/LabelFieldPair';
 import { SubmitBar } from '@/components/digit/SubmitBar';
-import { apiClient, ENVIRONMENTS, ApiClientError } from '@/api';
+import { apiClient, getApiBaseUrl, ApiClientError } from '@/api';
 
 type AppMode = 'onboarding' | 'management';
 
@@ -17,10 +16,9 @@ export default function LoginPage() {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    environment: ENVIRONMENTS[0].url,
     username: 'ADMIN',
     password: 'eGov@123',
-    tenantCode: 'statea',
+    tenantCode: 'ke',
   });
   const [mode, setMode] = useState<AppMode>('onboarding');
   const [showPassword, setShowPassword] = useState(false);
@@ -33,8 +31,9 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // Set environment first
-      apiClient.setEnvironment(formData.environment);
+      // Auto-detect environment from current origin
+      const environment = getApiBaseUrl();
+      apiClient.setEnvironment(environment);
 
       // Attempt real login
       const response = await apiClient.login({
@@ -68,7 +67,7 @@ export default function LoginPage() {
           uuid: response.UserRequest.uuid,
           mobileNumber: response.UserRequest.mobileNumber,
         },
-        formData.environment,
+        environment,
         formData.tenantCode,
         mode
       );
@@ -98,8 +97,8 @@ export default function LoginPage() {
             <div className="w-1 h-12 bg-primary mr-3" />
             <Database className="w-10 h-10 text-primary" />
           </div>
-          <h1 className="text-2xl font-condensed font-bold text-foreground">CRS Configurator</h1>
-          <p className="text-muted-foreground mt-1">Configure your DIGIT environment</p>
+          <h1 className="text-2xl font-condensed font-bold text-foreground">DIGIT Complaints Management</h1>
+          <p className="text-muted-foreground mt-1">Admin Console</p>
         </div>
 
         {/* Login form - DIGIT Card */}
@@ -153,28 +152,6 @@ export default function LoginPage() {
                 </AlertDescription>
               </Alert>
             )}
-
-            {/* Environment */}
-            <LabelFieldPair>
-              <CardLabel required>Environment</CardLabel>
-              <Field>
-                <Select
-                  value={formData.environment}
-                  onValueChange={(value) => setFormData({ ...formData, environment: value })}
-                >
-                  <SelectTrigger id="environment" className="border-input-border focus:border-primary focus:ring-primary">
-                    <SelectValue placeholder="Select environment" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ENVIRONMENTS.map((env) => (
-                      <SelectItem key={env.url} value={env.url}>
-                        {env.name} ({env.url.replace('https://', '')})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            </LabelFieldPair>
 
             {/* Username */}
             <LabelFieldPair>

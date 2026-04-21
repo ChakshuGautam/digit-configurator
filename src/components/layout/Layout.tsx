@@ -63,8 +63,8 @@ export default function Layout() {
               <div className="flex items-center">
                 <div className="w-1 h-8 sm:h-10 bg-primary mr-2 sm:mr-3" />
                 <div>
-                  <span className="font-condensed font-bold text-foreground text-base sm:text-lg">CRS</span>
-                  <span className="font-condensed font-medium text-muted-foreground text-base sm:text-lg ml-1">Data Loader</span>
+                  <span className="font-condensed font-bold text-foreground text-base sm:text-lg">DIGIT</span>
+                  <span className="font-condensed font-medium text-muted-foreground text-base sm:text-lg ml-1">Admin Console</span>
                 </div>
               </div>
             </div>
@@ -180,7 +180,7 @@ export default function Layout() {
       <footer className="bg-secondary text-white py-3 sm:py-4 mt-auto">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
           <p className="text-center text-xs sm:text-sm">
-            CRS Configurator • <span className="hidden sm:inline">Press <kbd className="px-1.5 py-0.5 bg-white/20 rounded text-xs">Ctrl+/</kbd> for help</span>
+            DIGIT Complaints Management • <span className="hidden sm:inline">Press <kbd className="px-1.5 py-0.5 bg-white/20 rounded text-xs">Ctrl+/</kbd> for help</span>
           </p>
         </div>
       </footer>

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { useGetList, type RaRecord } from 'ra-core';
+import { useQuery } from '@tanstack/react-query';
+import { digitClient } from '@/providers/bridge';
 
 // ---------- Types -----------------------------------------------------------
 
@@ -40,48 +41,153 @@ export interface PgrStats {
   byChannelTable: BreakdownRow[];
 }
 
-// ---------- Helpers ---------------------------------------------------------
+// ---------- MV response types -----------------------------------------------
 
-const CLOSED_STATUSES = new Set(['RESOLVED', 'CLOSEDAFTERRESOLUTION']);
-
-function isOpen(status: string): boolean {
-  return !CLOSED_STATUSES.has(status);
+interface MvKpi {
+  total: number;
+  closed: number;
+  completion_rate: number;
+  avg_resolution_days: number | null;
+  unique_citizens: number;
 }
 
-function monthKey(ts: number): string {
-  const d = new Date(ts);
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${months[d.getMonth()]}-${d.getFullYear()}`;
+interface MvMonthly {
+  month_label: string;
+  month_date: string;
+  total: number;
+  closed: number;
+  open_count: number;
+  unique_citizens: number;
 }
 
-function buildBreakdown(
-  groups: Map<string, RaRecord[]>,
-): BreakdownRow[] {
-  const rows: BreakdownRow[] = [];
-  for (const [name, items] of groups) {
-    const open = items.filter((c) => isOpen(String(c.applicationStatus ?? ''))).length;
-    const closed = items.length - open;
-    const closedItems = items.filter((c) => CLOSED_STATUSES.has(String(c.applicationStatus ?? '')));
-    let avgRes = 0;
-    if (closedItems.length > 0) {
-      const totalDays = closedItems.reduce((sum, c) => {
-        const audit = c.auditDetails as Record<string, unknown> | undefined;
-        const created = Number(audit?.createdTime ?? 0);
-        const modified = Number(audit?.lastModifiedTime ?? 0);
-        return sum + (modified > created ? (modified - created) / (1000 * 60 * 60 * 24) : 0);
-      }, 0);
-      avgRes = Math.round((totalDays / closedItems.length) * 10) / 10;
-    }
-    rows.push({
-      name,
-      open,
-      closed,
-      total: items.length,
-      avgResolution: avgRes,
-      completionRate: items.length > 0 ? Math.round((closed / items.length) * 1000) / 10 : 0,
-    });
+interface MvMonthlySource {
+  month_label: string;
+  month_date: string;
+  source: string;
+  total: number;
+}
+
+interface MvDimension {
+  dimension: string;
+  dim_value: string;
+  total: number;
+  closed: number;
+  open_count: number;
+  avg_resolution_days: number | null;
+  completion_rate: number;
+}
+
+interface MvDepartment {
+  department: string;
+  total: number;
+  closed: number;
+  open_count: number;
+  avg_resolution_days: number | null;
+  completion_rate: number;
+}
+
+interface DashboardResponse {
+  kpi: MvKpi;
+  monthly: MvMonthly[];
+  monthly_source: MvMonthlySource[];
+  dimensions: MvDimension[];
+  departments: MvDepartment[];
+  refreshed_at: string;
+}
+
+// ---------- Transform MV response → PgrStats --------------------------------
+
+function transformResponse(data: DashboardResponse): PgrStats {
+  const { kpi, monthly, monthly_source, dimensions, departments } = data;
+
+  // Build dimension lookups
+  const byStatusDims = dimensions.filter((d) => d.dimension === 'status');
+  const bySourceDims = dimensions.filter((d) => d.dimension === 'source');
+  const byTypeDims = dimensions.filter((d) => d.dimension === 'type');
+  const byBoundaryDims = dimensions.filter((d) => d.dimension === 'boundary');
+
+  // KPI maps
+  const byStatus: Record<string, number> = {};
+  for (const d of byStatusDims) byStatus[d.dim_value] = d.total;
+
+  const bySource: Record<string, number> = {};
+  for (const d of bySourceDims) bySource[d.dim_value] = d.total;
+
+  // Top types (already sorted by total DESC from the API)
+  const topTypes = byTypeDims.slice(0, 10).map((d) => ({ name: d.dim_value, count: d.total }));
+
+  // Time series — monthly data is already sorted by month_date from the API
+  const labels = monthly.map((m) => m.month_label);
+  const openArr = monthly.map((m) => m.open_count);
+  const addressedArr = monthly.map((m) => m.closed);
+  const citizenCounts = monthly.map((m) => m.unique_citizens);
+
+  // Cumulative sums
+  const cumTotal: number[] = [];
+  const cumAddressed: number[] = [];
+  let runTotal = 0;
+  let runClosed = 0;
+  for (const m of monthly) {
+    runTotal += m.total;
+    runClosed += m.closed;
+    cumTotal.push(runTotal);
+    cumAddressed.push(runClosed);
   }
-  return rows.sort((a, b) => b.total - a.total);
+
+  // By-source time series — build a source → month_index → count map
+  const allSources = [...new Set(monthly_source.map((ms) => ms.source))];
+  const monthDateIndex = new Map(monthly.map((m, i) => [m.month_date, i]));
+  const bySourceSeries: Record<string, number[]> = {};
+  for (const src of allSources) {
+    bySourceSeries[src] = new Array(labels.length).fill(0);
+  }
+  for (const ms of monthly_source) {
+    const idx = monthDateIndex.get(ms.month_date);
+    if (idx !== undefined && bySourceSeries[ms.source]) {
+      bySourceSeries[ms.source][idx] = ms.total;
+    }
+  }
+
+  // Breakdown tables
+  const toBreakdown = (dims: MvDimension[]): BreakdownRow[] =>
+    dims.map((d) => ({
+      name: d.dim_value,
+      open: d.open_count,
+      closed: d.closed,
+      total: d.total,
+      avgResolution: d.avg_resolution_days ?? 0,
+      completionRate: d.completion_rate,
+    }));
+
+  return {
+    total: kpi.total,
+    closed: kpi.closed,
+    completionRate: kpi.completion_rate,
+    byStatus,
+    bySource,
+    byDepartment: Object.fromEntries(departments.map((d) => [d.department, d.total])),
+    topTypes,
+    timeSeries: {
+      labels,
+      cumTotal,
+      cumAddressed,
+      bySource: bySourceSeries,
+      open: openArr,
+      addressed: addressedArr,
+    },
+    citizensSeries: { labels, counts: citizenCounts },
+    byBoundary: toBreakdown(byBoundaryDims),
+    byDeptTable: departments.map((d) => ({
+      name: d.department,
+      open: d.open_count,
+      closed: d.closed,
+      total: d.total,
+      avgResolution: d.avg_resolution_days ?? 0,
+      completionRate: d.completion_rate,
+    })),
+    byTypeTable: toBreakdown(byTypeDims),
+    byChannelTable: toBreakdown(bySourceDims),
+  };
 }
 
 // ---------- Hook ------------------------------------------------------------
@@ -91,174 +197,31 @@ export function usePgrDashboardData(): {
   isLoading: boolean;
   error: unknown;
 } {
-  const {
-    data: complaints,
-    isPending: complaintsLoading,
-    error: complaintsError,
-  } = useGetList<RaRecord>('complaints', {
-    pagination: { page: 1, perPage: 500 },
-    sort: { field: 'auditDetails.createdTime', order: 'DESC' },
-    filter: {},
-  });
+  const tenantId = digitClient.stateTenantId;
 
-  const {
-    data: complaintTypes,
-    isPending: typesLoading,
-  } = useGetList<RaRecord>('complaint-types', {
-    pagination: { page: 1, perPage: 200 },
-    sort: { field: 'serviceCode', order: 'ASC' },
-    filter: {},
+  const { data, isPending, error } = useQuery<DashboardResponse>({
+    queryKey: ['pgr-dashboard', tenantId],
+    queryFn: async () => {
+      const res = await fetch(`/api/pgr/dashboard?tenantId=${encodeURIComponent(tenantId!)}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      return res.json();
+    },
+    enabled: !!tenantId,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
   });
 
   const stats = useMemo<PgrStats | null>(() => {
-    if (!complaints || complaints.length === 0) return null;
-
-    // Build serviceCode → department lookup from complaint-types
-    const codeToDept = new Map<string, string>();
-    if (complaintTypes) {
-      for (const ct of complaintTypes) {
-        const code = String(ct.serviceCode ?? ct.id ?? '');
-        const dept = String(ct.department ?? 'Unknown');
-        if (code) codeToDept.set(code, dept);
-      }
-    }
-
-    // ---- KPIs ----
-    const total = complaints.length;
-    let closed = 0;
-    const byStatus: Record<string, number> = {};
-    const bySource: Record<string, number> = {};
-    const byDepartment: Record<string, number> = {};
-    const typeCount: Record<string, number> = {};
-    const citizenUuids = new Set<string>();
-
-    // Time-series buckets
-    const monthBuckets = new Map<string, { total: number; closed: number; bySrc: Record<string, number>; citizens: Set<string> }>();
-
-    // Breakdown groupers
-    const boundaryGroups = new Map<string, RaRecord[]>();
-    const deptGroups = new Map<string, RaRecord[]>();
-    const typeGroups = new Map<string, RaRecord[]>();
-    const channelGroups = new Map<string, RaRecord[]>();
-
-    for (const c of complaints) {
-      const status = String(c.applicationStatus ?? 'UNKNOWN');
-      const source = String(c.source ?? 'unknown').toLowerCase();
-      const serviceCode = String(c.serviceCode ?? 'unknown');
-      const dept = codeToDept.get(serviceCode) ?? 'Unknown';
-      const audit = c.auditDetails as Record<string, unknown> | undefined;
-      const createdTime = Number(audit?.createdTime ?? 0);
-      const citizen = c.citizen as Record<string, unknown> | undefined;
-      const citizenUuid = String(citizen?.uuid ?? '');
-      const address = c.address as Record<string, unknown> | undefined;
-      const locality = address?.locality as Record<string, unknown> | undefined;
-      const localityName = String(locality?.name ?? locality?.code ?? 'Unknown');
-
-      // KPIs
-      if (CLOSED_STATUSES.has(status)) closed++;
-      byStatus[status] = (byStatus[status] ?? 0) + 1;
-      bySource[source] = (bySource[source] ?? 0) + 1;
-      byDepartment[dept] = (byDepartment[dept] ?? 0) + 1;
-      typeCount[serviceCode] = (typeCount[serviceCode] ?? 0) + 1;
-      if (citizenUuid) citizenUuids.add(citizenUuid);
-
-      // Time series
-      if (createdTime > 0) {
-        const mk = monthKey(createdTime);
-        if (!monthBuckets.has(mk)) {
-          monthBuckets.set(mk, { total: 0, closed: 0, bySrc: {}, citizens: new Set() });
-        }
-        const bucket = monthBuckets.get(mk)!;
-        bucket.total++;
-        if (CLOSED_STATUSES.has(status)) bucket.closed++;
-        bucket.bySrc[source] = (bucket.bySrc[source] ?? 0) + 1;
-        if (citizenUuid) bucket.citizens.add(citizenUuid);
-      }
-
-      // Breakdown groups
-      if (!boundaryGroups.has(localityName)) boundaryGroups.set(localityName, []);
-      boundaryGroups.get(localityName)!.push(c);
-
-      if (!deptGroups.has(dept)) deptGroups.set(dept, []);
-      deptGroups.get(dept)!.push(c);
-
-      if (!typeGroups.has(serviceCode)) typeGroups.set(serviceCode, []);
-      typeGroups.get(serviceCode)!.push(c);
-
-      if (!channelGroups.has(source)) channelGroups.set(source, []);
-      channelGroups.get(source)!.push(c);
-    }
-
-    // Top types
-    const topTypes = Object.entries(typeCount)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 10)
-      .map(([name, count]) => ({ name, count }));
-
-    // Build sorted time-series
-    const sortedMonths = [...monthBuckets.keys()].sort((a, b) => {
-      const parseMonth = (s: string) => {
-        const [m, y] = s.split('-');
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        return new Date(Number(y), months.indexOf(m)).getTime();
-      };
-      return parseMonth(a) - parseMonth(b);
-    });
-
-    const allSources = Object.keys(bySource);
-    const cumTotal: number[] = [];
-    const cumAddressed: number[] = [];
-    const openArr: number[] = [];
-    const addressedArr: number[] = [];
-    const bySourceSeries: Record<string, number[]> = {};
-    for (const s of allSources) bySourceSeries[s] = [];
-    const citizenCounts: number[] = [];
-    let runTotal = 0;
-    let runClosed = 0;
-
-    for (const mk of sortedMonths) {
-      const bucket = monthBuckets.get(mk)!;
-      runTotal += bucket.total;
-      runClosed += bucket.closed;
-      cumTotal.push(runTotal);
-      cumAddressed.push(runClosed);
-      openArr.push(bucket.total - bucket.closed);
-      addressedArr.push(bucket.closed);
-      for (const s of allSources) {
-        bySourceSeries[s].push(bucket.bySrc[s] ?? 0);
-      }
-      citizenCounts.push(bucket.citizens.size);
-    }
-
-    const completionRate = total > 0 ? Math.round((closed / total) * 10000) / 100 : 0;
-
-    return {
-      total,
-      closed,
-      completionRate,
-      byStatus,
-      bySource,
-      byDepartment,
-      topTypes,
-      timeSeries: {
-        labels: sortedMonths,
-        cumTotal,
-        cumAddressed,
-        bySource: bySourceSeries,
-        open: openArr,
-        addressed: addressedArr,
-      },
-      citizensSeries: { labels: sortedMonths, counts: citizenCounts },
-      byBoundary: buildBreakdown(boundaryGroups),
-      byDeptTable: buildBreakdown(deptGroups),
-      byTypeTable: buildBreakdown(typeGroups),
-      byChannelTable: buildBreakdown(channelGroups),
-    };
-  }, [complaints, complaintTypes]);
+    if (!data || data.kpi.total === 0) return null;
+    return transformResponse(data);
+  }, [data]);
 
   return {
     stats,
-    isLoading: complaintsLoading || typesLoading,
-    error: complaintsError,
+    isLoading: isPending,
+    error,
   };
 }

@@ -134,14 +134,14 @@ export function DigitLayout({ children }: { children?: ReactNode }) {
           sidebarCollapsed ? 'w-16' : 'w-64'
         } bg-card border-r border-border flex flex-col transition-all duration-200`}
       >
-        {/* Sidebar Header — DIGIT Studio branding */}
+        {/* Sidebar Header — DIGIT Admin Console branding */}
         <div className="h-16 border-b border-border flex items-center px-4 gap-2">
           <div className="w-1 h-8 bg-primary" />
           {!sidebarCollapsed && (
             <div>
               <span className="font-condensed font-bold text-foreground">DIGIT</span>
               <span className="font-condensed font-medium text-muted-foreground ml-1">
-                Studio
+                Complaints Management
               </span>
             </div>
           )}

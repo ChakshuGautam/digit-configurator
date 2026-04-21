@@ -253,7 +253,7 @@ export default function Phase3Page() {
               <ul className="text-xs sm:text-sm space-y-1">
                 <li>• Create departments for your tenant</li>
                 <li>• Create designations linked to departments</li>
-                <li>• Configure CRS complaint types and categories</li>
+                <li>• Configure complaint types and categories</li>
               </ul>
             </AlertDescription>
           </Alert>

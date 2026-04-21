@@ -1,18 +1,11 @@
 // DIGIT Environment Configuration
 
-export interface Environment {
-  name: string;
-  url: string;
-  description: string;
+/** Auto-detect API base URL from the current origin. Each deployment serves
+ *  the configurator and DIGIT APIs from the same domain via nginx. */
+export function getApiBaseUrl(): string {
+  if (typeof window !== 'undefined') return window.location.origin;
+  return 'https://localhost';
 }
-
-export const ENVIRONMENTS: Environment[] = [
-  {
-    name: 'Chakshu Dev',
-    url: 'https://api.egov.theflywheel.in',
-    description: 'Chakshu development environment',
-  },
-];
 
 // Service endpoints
 export const ENDPOINTS = {
