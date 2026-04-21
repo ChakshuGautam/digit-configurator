@@ -23,7 +23,15 @@ export const boundaryService = {
     return hierarchies as BoundaryHierarchy[];
   },
 
-  // Create a new boundary hierarchy
+  // Create a new boundary hierarchy.
+  //
+  // Backend quirk: the create endpoint sends a single-object request
+  // but responds with BoundaryHierarchy as an ARRAY (the search
+  // endpoint uses the same response shape, which is also an array).
+  // Casting the array directly to a single BoundaryHierarchy at the
+  // type level silently succeeds — TS has no idea the shape is wrong
+  // at runtime — and the caller ends up holding an object where
+  // `.hierarchyType` is undefined.
   async createHierarchy(
     tenantId: string,
     hierarchyType: string,
@@ -38,7 +46,9 @@ export const boundaryService = {
       },
     });
 
-    return response.BoundaryHierarchy as BoundaryHierarchy;
+    const raw = response.BoundaryHierarchy;
+    if (Array.isArray(raw)) return raw[0] as BoundaryHierarchy;
+    return raw as BoundaryHierarchy;
   },
 
   // Helper to create hierarchy from level names
