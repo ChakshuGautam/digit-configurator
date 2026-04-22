@@ -142,7 +142,17 @@ export function AssignmentEditor({
             const radioName = `${id}-current`;
 
             return (
-              <div key={index} className="border rounded p-3 bg-muted/30">
+              <div key={index} className="relative border rounded p-3 pr-10 bg-muted/30">
+                <button
+                  type="button"
+                  onClick={() => removeRow(index)}
+                  disabled={blockRemove}
+                  aria-label={`Remove assignment ${index + 1}`}
+                  title={blockRemove ? 'Mark another assignment as current first' : undefined}
+                  className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 disabled:pointer-events-none"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <Label className="mb-1.5 block text-xs font-medium text-foreground">
@@ -224,7 +234,7 @@ export function AssignmentEditor({
                   </div>
                 </div>
 
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="mt-3 flex flex-wrap items-center gap-3">
                   <label className="inline-flex items-center gap-2 text-sm">
                     <input
                       type="radio"
@@ -233,27 +243,15 @@ export function AssignmentEditor({
                       onChange={() => setCurrent(index)}
                       className="h-4 w-4"
                     />
-                    Current assignment
+                    <span className={isCurrent ? 'font-medium text-foreground' : 'text-muted-foreground'}>
+                      Current assignment
+                    </span>
                   </label>
-
-                  <div className="flex flex-col items-end gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeRow(index)}
-                      disabled={blockRemove}
-                      aria-label={`Remove assignment ${index + 1}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Remove
-                    </Button>
-                    {blockRemove && (
-                      <p className="text-xs text-muted-foreground">
-                        Mark another assignment as current first
-                      </p>
-                    )}
-                  </div>
+                  {blockRemove && (
+                    <span className="text-xs text-muted-foreground">
+                      Mark another current first to remove this row
+                    </span>
+                  )}
                 </div>
               </div>
             );

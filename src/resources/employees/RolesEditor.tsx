@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
 import type { KeyboardEvent } from 'react';
 import { useInput } from 'ra-core';
-import { X } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { Role } from '@/api/types';
@@ -138,29 +138,36 @@ export function RolesEditor({
         ))}
       </div>
 
-      <Input
-        id={id}
-        type="text"
-        role="combobox"
-        autoComplete="off"
-        aria-expanded={open}
-        aria-controls={listboxId}
-        aria-autocomplete="list"
-        aria-invalid={hasError || undefined}
-        aria-describedby={hasError ? `${id}-error` : undefined}
-        placeholder={isLoading ? 'Loading roles...' : 'Search roles...'}
-        disabled={isLoading}
-        value={query}
-        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)}
-        onKeyDown={handleKey}
-        onBlur={field.onBlur}
-        className={hasError ? 'border-destructive focus-visible:ring-destructive' : ''}
-      />
-
-      {isLoading && (
-        <p className="mt-1 text-xs text-muted-foreground">Loading roles...</p>
-      )}
+      <div className="relative">
+        <Input
+          id={id}
+          type="text"
+          role="combobox"
+          autoComplete="off"
+          aria-expanded={open}
+          aria-controls={listboxId}
+          aria-autocomplete="list"
+          aria-invalid={hasError || undefined}
+          aria-describedby={hasError ? `${id}-error` : undefined}
+          placeholder={isLoading ? 'Loading roles…' : 'Search roles…'}
+          disabled={isLoading}
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={handleKey}
+          onBlur={field.onBlur}
+          className={
+            'pr-8 ' + (hasError ? 'border-destructive focus-visible:ring-destructive' : '')
+          }
+        />
+        <ChevronDown
+          aria-hidden
+          className={
+            'pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-transform ' +
+            (open ? 'rotate-180' : '')
+          }
+        />
+      </div>
 
       {open && !isLoading && (
         <ul

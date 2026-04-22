@@ -189,7 +189,15 @@ export function JurisdictionEditor({
             const boundaryOptions = getBoundaryOptions(hierarchyType, boundaryType);
 
             return (
-              <div key={index} className="border rounded p-3 bg-muted/30">
+              <div key={index} className="relative border rounded p-3 pr-10 bg-muted/30">
+                <button
+                  type="button"
+                  onClick={() => removeRow(index)}
+                  aria-label={`Remove jurisdiction ${index + 1}`}
+                  className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <Label className="mb-1.5 block text-xs font-medium text-foreground">
@@ -270,18 +278,6 @@ export function JurisdictionEditor({
                   </div>
                 </div>
 
-                <div className="mt-2 flex justify-end">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeRow(index)}
-                    aria-label={`Remove jurisdiction ${index + 1}`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Remove
-                  </Button>
-                </div>
               </div>
             );
           })}
