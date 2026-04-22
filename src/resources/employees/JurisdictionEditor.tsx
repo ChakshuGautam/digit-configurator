@@ -124,15 +124,22 @@ export function JurisdictionEditor({
 
   const writeRows = (next: EmployeeJurisdiction[]) => {
     field.onChange(
-      next.map((r) => ({
-        ...r,
-        // HRMS's DTO validates `hierarchy` (NotNull). Stamp both field names so
-        // either the legacy or MDMS-aligned reader is satisfied.
-        hierarchy: r.hierarchyType ?? '',
-        hierarchyType: r.hierarchyType ?? '',
-        isActive: true,
-        tenantId,
-      })),
+      next.map((r) => {
+        // Boundaries live under the tenant that seeded them (e.g. NAIROBI_CITY
+        // lives under ke.nairobi, BOMET under ke). HRMS stores each
+        // jurisdiction with the boundary's *home* tenantId, not the session's.
+        // Fall back to the session tenant only if we can't resolve.
+        const rowTenant = (r as Record<string, unknown>).tenantId;
+        const resolvedTenant = typeof rowTenant === 'string' && rowTenant ? rowTenant : tenantId;
+        return {
+          ...r,
+          // HRMS's DTO validates `hierarchy` (NotNull). Stamp both field names.
+          hierarchy: r.hierarchyType ?? '',
+          hierarchyType: r.hierarchyType ?? '',
+          isActive: true,
+          tenantId: resolvedTenant,
+        };
+      }),
     );
   };
 
@@ -268,7 +275,18 @@ export function JurisdictionEditor({
                     </Label>
                     <Select
                       value={boundary}
-                      onValueChange={(value) => updateRow(index, { boundary: value })}
+                      onValueChange={(value) => {
+                        const picked = boundaryOptions.find((b) => b.code === value);
+                        updateRow(index, {
+                          boundary: value,
+                          // Inherit the selected boundary's home tenant so HRMS
+                          // can resolve it — boundaries at ke.nairobi are not
+                          // visible under ke and vice versa.
+                          ...(picked?.tenantId
+                            ? ({ tenantId: picked.tenantId } as Partial<EmployeeJurisdiction>)
+                            : {}),
+                        });
+                      }}
                       disabled={!boundaryType || boundariesLoading}
                     >
                       <SelectTrigger>
@@ -280,6 +298,11 @@ export function JurisdictionEditor({
                         {boundaryOptions.map((b) => (
                           <SelectItem key={b.code} value={b.code} data-value={b.code}>
                             {b.name ?? b.code}
+                            {b.tenantId && b.tenantId !== tenantId ? (
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                · {b.tenantId}
+                              </span>
+                            ) : null}
                           </SelectItem>
                         ))}
                       </SelectContent>

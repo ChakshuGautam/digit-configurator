@@ -104,24 +104,50 @@ async function hrmsGetList(client: DigitApiClient, config: ResourceConfig, tenan
 async function boundaryGetList(client: DigitApiClient, config: ResourceConfig, tenantId: string): Promise<RaRecord[]> {
   function flattenTrees(trees: Record<string, unknown>[]): RaRecord[] {
     const flat: RaRecord[] = [];
-    function flatten(nodes: unknown[], parentCode?: string) {
+    function flatten(
+      nodes: unknown[],
+      parentCode: string | undefined,
+      treeTenantId: string | undefined,
+      treeHierarchyType: string | undefined,
+    ) {
       if (!Array.isArray(nodes)) return;
       for (const node of nodes as Record<string, unknown>[]) {
-        flat.push(normalizeRecord({ ...node, parentCode }, config));
-        if (Array.isArray(node.children)) flatten(node.children as unknown[], node.code as string);
+        // Stamp tenantId + hierarchyType on every flattened node from its
+        // enclosing tree wrapper. Downstream editors (JurisdictionEditor)
+        // use these to scope jurisdiction rows to the boundary's home
+        // tenant, not the session tenant.
+        flat.push(
+          normalizeRecord(
+            {
+              ...node,
+              parentCode,
+              tenantId: (node.tenantId as string | undefined) ?? treeTenantId,
+              hierarchyType: (node.hierarchyType as string | undefined) ?? treeHierarchyType,
+            },
+            config,
+          ),
+        );
+        if (Array.isArray(node.children)) {
+          flatten(node.children as unknown[], node.code as string, treeTenantId, treeHierarchyType);
+        }
       }
     }
     for (const tree of trees) {
-      flatten((tree.boundary || []) as unknown[]);
+      const treeTenant = typeof tree.tenantId === 'string' ? tree.tenantId : undefined;
+      const treeHierarchy = typeof tree.hierarchyType === 'string' ? tree.hierarchyType : undefined;
+      flatten((tree.boundary || []) as unknown[], undefined, treeTenant, treeHierarchy);
     }
     return flat;
   }
 
-  const trees = await client.boundaryRelationshipSearch(tenantId, 'ADMIN');
-  const flat = flattenTrees(trees);
-  if (flat.length > 0) return flat;
+  // Always fetch the session tenant's tree first.
+  const rootTrees = await client.boundaryRelationshipSearch(tenantId, 'ADMIN').catch(() => []);
+  const rootFlat = flattenTrees(rootTrees as Record<string, unknown>[]);
 
-  // If root tenant returned 0, search city-level sub-tenants that have boundary hierarchies
+  // When the session is at state level, aggregate city sub-tenants too — a
+  // seeded BOMET tree at `ke` would otherwise hide NAIROBI_CITY at
+  // `ke.nairobi` (and peers). Each tenant's tree is concatenated; duplicates
+  // are avoided because tenants own disjoint boundary code-spaces.
   if (!tenantId.includes('.')) {
     const tenantRecords = await client.mdmsSearch(tenantId, 'tenant.tenants', { limit: 200 });
     const cityTenants = tenantRecords
@@ -129,9 +155,8 @@ async function boundaryGetList(client: DigitApiClient, config: ResourceConfig, t
       .map((r) => String(r.data.code));
 
     if (cityTenants.length > 0) {
-      // Pre-filter: only query tenants that have a boundary hierarchy defined (avoids 400 errors)
       const hierarchyChecks = await Promise.allSettled(
-        cityTenants.map((ct) => client.boundaryHierarchySearch(ct))
+        cityTenants.map((ct) => client.boundaryHierarchySearch(ct)),
       );
       const tenantsWithHierarchies = cityTenants.filter((_, i) => {
         const result = hierarchyChecks[i];
@@ -139,15 +164,20 @@ async function boundaryGetList(client: DigitApiClient, config: ResourceConfig, t
       });
 
       if (tenantsWithHierarchies.length > 0) {
-        const results = await Promise.all(
-          tenantsWithHierarchies.map((ct) => client.boundaryRelationshipSearch(ct, 'ADMIN').catch(() => []))
+        const cityResults = await Promise.all(
+          tenantsWithHierarchies.map((ct) =>
+            client.boundaryRelationshipSearch(ct, 'ADMIN').catch(() => []),
+          ),
         );
-        return results.flatMap((trees) => flattenTrees(trees as Record<string, unknown>[]));
+        const cityFlat = cityResults.flatMap((trees) =>
+          flattenTrees(trees as Record<string, unknown>[]),
+        );
+        return [...rootFlat, ...cityFlat];
       }
     }
   }
 
-  return [];
+  return rootFlat;
 }
 
 async function pgrGetList(client: DigitApiClient, config: ResourceConfig, tenantId: string, filter?: Record<string, unknown>): Promise<RaRecord[]> {
