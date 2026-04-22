@@ -112,6 +112,15 @@ export default function Phase3Page() {
 
     try {
       // Create departments
+      // Track outcomes locally — React state updates don't reflect into the
+      // captured variable until the next render, so reading createdDepts /
+      // createdDesigs / createdComplaints inside this same async block always
+      // returns 0 (the initial state). The toast strings below need the real
+      // counts from this run, hence the local mirrors.
+      let deptsCreated = 0;
+      let desigsCreated = 0;
+      let complaintsCreated = 0;
+
       if (departments.length > 0) {
         setProgressMessage('Creating departments...');
         const deptResults = await mdmsService.createDepartments(
@@ -122,7 +131,8 @@ export default function Phase3Page() {
             active: d.active,
           }))
         );
-        setCreatedDepts(deptResults.success.length);
+        deptsCreated = deptResults.success.length;
+        setCreatedDepts(deptsCreated);
 
         // Create localizations for departments
         await localizationService.uploadDepartmentLocalizations(
@@ -147,7 +157,8 @@ export default function Phase3Page() {
             active: d.active,
           }))
         );
-        setCreatedDesigs(desigResults.success.length);
+        desigsCreated = desigResults.success.length;
+        setCreatedDesigs(desigsCreated);
 
         // Create localizations for designations
         await localizationService.uploadDesignationLocalizations(
@@ -159,7 +170,7 @@ export default function Phase3Page() {
         setProgress(60);
       }
 
-      addUndo('create_departments', `Created ${createdDepts} departments and ${createdDesigs} designations`);
+      addUndo('create_departments', `Created ${deptsCreated} departments and ${desigsCreated} designations`);
 
       // Switch to complaint types
       setStep('creating-complaints');
@@ -179,7 +190,8 @@ export default function Phase3Page() {
             active: ct.active,
           }))
         );
-        setCreatedComplaints(complaintResults.success.length);
+        complaintsCreated = complaintResults.success.length;
+        setCreatedComplaints(complaintsCreated);
 
         // Create localizations for complaint types
         await localizationService.uploadComplaintTypeLocalizations(
@@ -194,7 +206,7 @@ export default function Phase3Page() {
         setProgress(100);
       }
 
-      addUndo('create_complaints', `Created ${createdComplaints} complaint types`);
+      addUndo('create_complaints', `Created ${complaintsCreated} complaint types`);
       setStep('complete');
     } catch (err) {
       console.error('MDMS creation error:', err);

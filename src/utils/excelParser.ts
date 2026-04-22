@@ -321,14 +321,10 @@ export function parseBoundaryExcel(workbook: XLSX.WorkBook): {
   }
 
   if (!sheet) {
-    sheet = workbook.Sheets[workbook.SheetNames[0]];
-  }
-
-  if (!sheet) {
     errors.push({
       field: 'file',
-      message: 'No valid boundary sheet found',
-      code: 'NO_SHEET',
+      message: `No boundary sheet found. Expected one of: ${sheetNames.join(', ')}. Got sheets in this file: ${workbook.SheetNames.join(', ')}.`,
+      code: 'WRONG_SHEET',
     });
     return { data: [], hierarchyLevels: [], validation: { valid: false, errors, warnings } };
   }
@@ -428,14 +424,10 @@ export function parseDepartmentExcel(workbook: XLSX.WorkBook): {
   }
 
   if (!sheet) {
-    sheet = workbook.Sheets[workbook.SheetNames[0]];
-  }
-
-  if (!sheet) {
     errors.push({
       field: 'file',
-      message: 'No valid department sheet found',
-      code: 'NO_SHEET',
+      message: `No department sheet found. Expected one of: Department, Departments, DepartmentMaster, department. Got sheets in this file: ${workbook.SheetNames.join(', ')}.`,
+      code: 'WRONG_SHEET',
     });
     return { data: [], validation: { valid: false, errors, warnings } };
   }
@@ -504,14 +496,10 @@ export function parseDesignationExcel(workbook: XLSX.WorkBook): {
   }
 
   if (!sheet) {
-    sheet = workbook.Sheets[workbook.SheetNames[0]];
-  }
-
-  if (!sheet) {
     errors.push({
       field: 'file',
-      message: 'No valid designation sheet found',
-      code: 'NO_SHEET',
+      message: `No designation sheet found. Expected one of: Designation, Designations, DesignationMaster, designation. Got sheets in this file: ${workbook.SheetNames.join(', ')}.`,
+      code: 'WRONG_SHEET',
     });
     return { data: [], validation: { valid: false, errors, warnings } };
   }
@@ -583,14 +571,10 @@ export function parseComplaintTypeExcel(workbook: XLSX.WorkBook): {
   }
 
   if (!sheet) {
-    sheet = workbook.Sheets[workbook.SheetNames[0]];
-  }
-
-  if (!sheet) {
     errors.push({
       field: 'file',
-      message: 'No valid complaint type sheet found',
-      code: 'NO_SHEET',
+      message: `No complainttype sheet found. Expected one of: ComplaintType, ComplaintTypes, ServiceDefs, servicedefs, PGR. Got sheets in this file: ${workbook.SheetNames.join(', ')}.`,
+      code: 'WRONG_SHEET',
     });
     return { data: [], validation: { valid: false, errors, warnings } };
   }
@@ -673,14 +657,10 @@ export function parseEmployeeExcel(workbook: XLSX.WorkBook): {
   }
 
   if (!sheet) {
-    sheet = workbook.Sheets[workbook.SheetNames[0]];
-  }
-
-  if (!sheet) {
     errors.push({
       field: 'file',
-      message: 'No valid employee sheet found',
-      code: 'NO_SHEET',
+      message: `No employee sheet found. Expected one of: Employee, Employees, EmployeeMaster, HRMS, employee. Got sheets in this file: ${workbook.SheetNames.join(', ')}.`,
+      code: 'WRONG_SHEET',
     });
     return { data: [], validation: { valid: false, errors, warnings } };
   }
