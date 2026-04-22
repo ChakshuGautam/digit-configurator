@@ -137,7 +137,8 @@ export interface Department {
 export interface Designation {
   code: string;
   name: string;
-  department?: string;
+  description: string;
+  department?: string[];
   active: boolean;
   tenantId?: string;
 }
@@ -145,7 +146,8 @@ export interface Designation {
 // Complaint Type / Service Definition
 export interface ComplaintType {
   serviceCode: string;
-  serviceName: string;
+  name: string;
+  keywords: string;
   department: string;
   slaHours: number;
   menuPath?: string;
@@ -370,13 +372,15 @@ export interface DepartmentExcelRow {
 export interface DesignationExcelRow {
   code: string;
   name: string;
-  department?: string;
+  description: string;
+  department?: string[];
   active: boolean;
 }
 
 export interface ComplaintTypeExcelRow {
   serviceCode: string;
-  serviceName: string;
+  name: string;
+  keywords: string;
   department: string;
   slaHours: number;
   active: boolean;
@@ -389,6 +393,7 @@ export interface EmployeeExcelRow {
   mobileNumber: string;
   emailId?: string;
   gender?: string;
+  dob?: string;
   department: string;
   designation: string;
   roles: string; // comma-separated

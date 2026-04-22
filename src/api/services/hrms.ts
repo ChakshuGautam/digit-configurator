@@ -101,6 +101,7 @@ export const hrmsService = {
     mobileNumber: string;
     emailId?: string;
     gender?: string;
+    dob?: number;
     department: string;
     designation: string;
     roles: Role[];
@@ -109,6 +110,12 @@ export const hrmsService = {
     password?: string;
   }): Employee {
     const now = Date.now();
+    // HRMS validates user.dob with @NotNull. If the caller didn't provide
+    // one, fall back to 1990-01-01 UTC — otherwise the create fails the
+    // whole batch with NotNull.employeeRequest.employees[0].user.dob.
+    // TODO: surface DOB as a proper form field / Excel column so we're
+    // not silently defaulting real data.
+    const dob = data.dob ?? Date.UTC(1990, 0, 1);
 
     const user: EmployeeUser = {
       userName: data.userName.toLowerCase(),
@@ -117,6 +124,7 @@ export const hrmsService = {
       mobileNumber: data.mobileNumber,
       emailId: data.emailId,
       gender: data.gender,
+      dob,
       type: 'EMPLOYEE',
       active: true,
       tenantId: data.tenantId,
@@ -137,7 +145,12 @@ export const hrmsService = {
       jurisdictions: data.jurisdictions.map((j) => ({
         boundary: j.boundary,
         boundaryType: j.boundaryType,
+        // HRMS DTO names this field `hierarchy`, not `hierarchyType` — the MDMS
+        // side uses `hierarchyType` elsewhere, so the naming is inconsistent
+        // across DIGIT. Send both so either spelling works.
+        hierarchy: j.hierarchyType,
         hierarchyType: j.hierarchyType,
+        tenantId: data.tenantId,
         isActive: true,
       })),
       assignments: [

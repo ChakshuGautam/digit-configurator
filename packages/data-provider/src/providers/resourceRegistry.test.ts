@@ -93,4 +93,30 @@ describe('resourceRegistry', () => {
     const result = getResourceBySchema('ACCESSCONTROL-ROLEACTIONS.roleactions');
     assert.strictEqual(result, 'role-actions');
   });
+
+  it('covers schemas registered on ke tenant that previously had no UI', () => {
+    // Pin Stage-0 hygiene: these 7 schemas live on `ke` but were invisible in
+    // the configurator before. If a future refactor drops one, this fails loud.
+    const expected: Record<string, string> = {
+      'theme-config': 'common-masters.ThemeConfig',
+      'user-validation': 'common-masters.UserValidation',
+      'mobile-validation': 'ValidationConfigs.mobileNumberValidation',
+      'tenant-boundary': 'egov-location.TenantBoundary',
+      'auto-escalation-ignore': 'Workflow.AutoEscalationStatesToIgnore',
+      'workflow-bs-master': 'Workflow.BusinessServiceMasterConfig',
+      'pgr-ui-constants': 'RAINMAKER-PGR.UIConstants',
+    };
+    for (const [resource, schema] of Object.entries(expected)) {
+      const cfg = getResourceConfig(resource);
+      assert.ok(cfg, `Missing resource ${resource}`);
+      assert.strictEqual(cfg.schema, schema, `${resource} should point to ${schema}`);
+    }
+  });
+
+  it('does not register schemas that do not exist on ke (phantom cleanup)', () => {
+    // `tenant.branding` is not registered on `ke` — the previous `branding`
+    // entry 404'd. Keep this assertion until branding becomes a real schema.
+    assert.strictEqual(getResourceBySchema('tenant.branding'), undefined);
+    assert.strictEqual(getResourceConfig('branding'), undefined);
+  });
 });

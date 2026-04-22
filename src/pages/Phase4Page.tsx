@@ -243,6 +243,7 @@ export default function Phase4Page() {
             mobileNumber: emp.mobileNumber,
             emailId: emp.emailId,
             gender: emp.gender,
+            dob: emp.dob ? new Date(emp.dob).getTime() : undefined,
             department: emp.department,
             designation: emp.designation,
             roles,
@@ -699,9 +700,19 @@ export default function Phase4Page() {
       {step === 'complete' && (
         <DigitCard>
           <Banner
-            successful={true}
-            message="Employees Created Successfully!"
-            info={`Tenant: ${state.tenant.toUpperCase()}`}
+            successful={createdCount > 0 && failedCount === 0}
+            message={
+              createdCount > 0 && failedCount === 0
+                ? 'Employees Created Successfully!'
+                : createdCount > 0
+                ? `Created ${createdCount}, ${failedCount} failed`
+                : `No employees created — ${failedCount} failed`
+            }
+            info={
+              failedCount > 0
+                ? `Tenant: ${state.tenant.toUpperCase()} • Check the failure list below and retry the failed rows.`
+                : `Tenant: ${state.tenant.toUpperCase()}`
+            }
           />
 
           <div className="mt-6 p-4 bg-muted rounded">

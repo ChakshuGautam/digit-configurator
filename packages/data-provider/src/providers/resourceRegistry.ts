@@ -87,7 +87,6 @@ export const REGISTRY: Record<string, ResourceConfig> = {
 
   // Generic MDMS Resources
   'state-info': { type: 'mdms', label: 'State Info', schema: 'common-masters.StateInfo', idField: 'code', nameField: 'name' },
-  branding: { type: 'mdms', label: 'Tenant Branding', schema: 'tenant.branding', idField: 'code', nameField: 'name' },
   'city-modules': { type: 'mdms', label: 'City Modules', schema: 'tenant.citymodule', idField: 'code', nameField: 'module' },
   'id-formats': { type: 'mdms', label: 'ID Formats', schema: 'common-masters.IdFormat', idField: 'idname', nameField: 'idname' },
   'workflow-services': { type: 'mdms', label: 'Business Services', schema: 'Workflow.BusinessService', idField: 'businessService', nameField: 'business' },
@@ -111,6 +110,17 @@ export const REGISTRY: Record<string, ResourceConfig> = {
   'employee-type': { type: 'mdms', label: 'Employee Type', schema: MDMS_SCHEMAS.EMPLOYEE_TYPE, idField: 'code', nameField: 'code' },
   'cron-jobs': { type: 'mdms', label: 'Cron Jobs', schema: 'common-masters.CronJobAPIConfig', idField: 'jobName', nameField: 'jobName' },
   'ui-homepage': { type: 'mdms', label: 'UI Homepage', schema: 'common-masters.uiHomePage', idField: 'redirectURL', nameField: 'redirectURL' },
+
+  // Added by Stage-0 registry hygiene: schemas live on `ke` but had no UI surface.
+  // These get the same generic CRUD as the entries above; richer per-field widgets
+  // are layered on later via src/admin/schemaDescriptors/ (Stage 1+).
+  'theme-config':           { type: 'mdms', label: 'Theme Config',             schema: 'common-masters.ThemeConfig',               idField: 'code',              nameField: 'name' },
+  'user-validation':        { type: 'mdms', label: 'User Field Validation',    schema: 'common-masters.UserValidation',            idField: 'fieldType',         nameField: 'fieldType' },
+  'mobile-validation':      { type: 'mdms', label: 'Mobile Number Validation', schema: 'ValidationConfigs.mobileNumberValidation', idField: 'validationName',    nameField: 'validationName' },
+  'tenant-boundary':        { type: 'mdms', label: 'Tenant Boundary (HRMS)',   schema: 'egov-location.TenantBoundary',             idField: 'hierarchyType.code', nameField: 'hierarchyType.code' },
+  'auto-escalation-ignore': { type: 'mdms', label: 'Auto-Escalation Ignored',  schema: 'Workflow.AutoEscalationStatesToIgnore',    idField: 'businessService',   nameField: 'businessService' },
+  'workflow-bs-master':     { type: 'mdms', label: 'Workflow BS Master',       schema: 'Workflow.BusinessServiceMasterConfig',     idField: 'active',            nameField: 'businessService' },
+  'pgr-ui-constants':       { type: 'mdms', label: 'PGR UI Constants',         schema: 'RAINMAKER-PGR.UIConstants',                idField: 'REOPENSLA',         nameField: 'REOPENSLA' },
 };
 
 export function getResourceConfig(resource: string): ResourceConfig | undefined {

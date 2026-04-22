@@ -321,14 +321,10 @@ export function parseBoundaryExcel(workbook: XLSX.WorkBook): {
   }
 
   if (!sheet) {
-    sheet = workbook.Sheets[workbook.SheetNames[0]];
-  }
-
-  if (!sheet) {
     errors.push({
       field: 'file',
-      message: 'No valid boundary sheet found',
-      code: 'NO_SHEET',
+      message: `No boundary sheet found. Expected one of: ${sheetNames.join(', ')}. Got sheets in this file: ${workbook.SheetNames.join(', ')}.`,
+      code: 'WRONG_SHEET',
     });
     return { data: [], hierarchyLevels: [], validation: { valid: false, errors, warnings } };
   }
@@ -428,14 +424,10 @@ export function parseDepartmentExcel(workbook: XLSX.WorkBook): {
   }
 
   if (!sheet) {
-    sheet = workbook.Sheets[workbook.SheetNames[0]];
-  }
-
-  if (!sheet) {
     errors.push({
       field: 'file',
-      message: 'No valid department sheet found',
-      code: 'NO_SHEET',
+      message: `No department sheet found. Expected one of: Department, Departments, DepartmentMaster, department. Got sheets in this file: ${workbook.SheetNames.join(', ')}.`,
+      code: 'WRONG_SHEET',
     });
     return { data: [], validation: { valid: false, errors, warnings } };
   }
@@ -504,14 +496,10 @@ export function parseDesignationExcel(workbook: XLSX.WorkBook): {
   }
 
   if (!sheet) {
-    sheet = workbook.Sheets[workbook.SheetNames[0]];
-  }
-
-  if (!sheet) {
     errors.push({
       field: 'file',
-      message: 'No valid designation sheet found',
-      code: 'NO_SHEET',
+      message: `No designation sheet found. Expected one of: Designation, Designations, DesignationMaster, designation. Got sheets in this file: ${workbook.SheetNames.join(', ')}.`,
+      code: 'WRONG_SHEET',
     });
     return { data: [], validation: { valid: false, errors, warnings } };
   }
@@ -521,7 +509,9 @@ export function parseDesignationExcel(workbook: XLSX.WorkBook): {
   jsonData.forEach((row, index) => {
     const code = String(row['code'] || row['Code'] || row['designationCode'] || '').trim();
     const name = String(row['name'] || row['Name'] || row['designationName'] || '').trim();
-    const department = String(row['department'] || row['Department'] || '').trim() || undefined;
+    const description = String(row['description'] || row['Description'] || '').trim() || name;
+    const deptRaw = String(row['department'] || row['Department'] || '').trim();
+    const department = deptRaw ? deptRaw.split(',').map(s => s.trim()).filter(Boolean) : undefined;
     const activeStr = String(row['active'] || row['Active'] || row['isActive'] || 'true').trim().toLowerCase();
     const active = activeStr === 'true' || activeStr === 'yes' || activeStr === '1';
 
@@ -545,7 +535,7 @@ export function parseDesignationExcel(workbook: XLSX.WorkBook): {
       return;
     }
 
-    designations.push({ code, name, department, active });
+    designations.push({ code, name, description, department, active });
   });
 
   return {
@@ -581,14 +571,10 @@ export function parseComplaintTypeExcel(workbook: XLSX.WorkBook): {
   }
 
   if (!sheet) {
-    sheet = workbook.Sheets[workbook.SheetNames[0]];
-  }
-
-  if (!sheet) {
     errors.push({
       field: 'file',
-      message: 'No valid complaint type sheet found',
-      code: 'NO_SHEET',
+      message: `No complainttype sheet found. Expected one of: ComplaintType, ComplaintTypes, ServiceDefs, servicedefs, PGR. Got sheets in this file: ${workbook.SheetNames.join(', ')}.`,
+      code: 'WRONG_SHEET',
     });
     return { data: [], validation: { valid: false, errors, warnings } };
   }
@@ -597,7 +583,9 @@ export function parseComplaintTypeExcel(workbook: XLSX.WorkBook): {
 
   jsonData.forEach((row, index) => {
     const serviceCode = String(row['serviceCode'] || row['ServiceCode'] || row['code'] || '').trim();
-    const serviceName = String(row['serviceName'] || row['ServiceName'] || row['name'] || '').trim();
+    const name = String(row['name'] || row['Name'] || row['serviceName'] || row['ServiceName'] || '').trim();
+    const keywordsRaw = String(row['keywords'] || row['Keywords'] || '').trim();
+    const keywords = keywordsRaw || name.toLowerCase().replace(/\s+/g, ',');
     const department = String(row['department'] || row['Department'] || '').trim();
     const slaHours = parseInt(String(row['slaHours'] || row['SlaHours'] || row['sla'] || '24'), 10) || 24;
     const activeStr = String(row['active'] || row['Active'] || row['isActive'] || 'true').trim().toLowerCase();
@@ -613,10 +601,10 @@ export function parseComplaintTypeExcel(workbook: XLSX.WorkBook): {
       return;
     }
 
-    if (!serviceName) {
+    if (!name) {
       errors.push({
         row: index + 2,
-        field: 'serviceName',
+        field: 'name',
         message: 'Service name is required',
         code: 'REQUIRED_FIELD',
       });
@@ -633,7 +621,7 @@ export function parseComplaintTypeExcel(workbook: XLSX.WorkBook): {
       return;
     }
 
-    complaintTypes.push({ serviceCode, serviceName, department, slaHours, active });
+    complaintTypes.push({ serviceCode, name, keywords, department, slaHours, active });
   });
 
   return {
@@ -669,14 +657,10 @@ export function parseEmployeeExcel(workbook: XLSX.WorkBook): {
   }
 
   if (!sheet) {
-    sheet = workbook.Sheets[workbook.SheetNames[0]];
-  }
-
-  if (!sheet) {
     errors.push({
       field: 'file',
-      message: 'No valid employee sheet found',
-      code: 'NO_SHEET',
+      message: `No employee sheet found. Expected one of: Employee, Employees, EmployeeMaster, HRMS, employee. Got sheets in this file: ${workbook.SheetNames.join(', ')}.`,
+      code: 'WRONG_SHEET',
     });
     return { data: [], validation: { valid: false, errors, warnings } };
   }
@@ -690,6 +674,7 @@ export function parseEmployeeExcel(workbook: XLSX.WorkBook): {
     const mobileNumber = String(row['mobileNumber'] || row['MobileNumber'] || row['mobile'] || row['phone'] || '').trim();
     const emailId = String(row['emailId'] || row['EmailId'] || row['email'] || '').trim() || undefined;
     const gender = String(row['gender'] || row['Gender'] || '').trim() || undefined;
+    const dob = String(row['dob'] || row['DOB'] || row['dateOfBirth'] || '').trim() || undefined;
     const department = String(row['department'] || row['Department'] || '').trim();
     const designation = String(row['designation'] || row['Designation'] || '').trim();
     const roles = String(row['roles'] || row['Roles'] || row['role'] || 'EMPLOYEE').trim();
@@ -779,6 +764,7 @@ export function parseEmployeeExcel(workbook: XLSX.WorkBook): {
       mobileNumber,
       emailId,
       gender,
+      dob,
       department,
       designation,
       roles,

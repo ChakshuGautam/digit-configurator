@@ -14,6 +14,8 @@ export interface DigitFormInputProps extends InputProps {
   disabled?: boolean;
   /** Additional CSS class names for the wrapper */
   className?: string;
+  /** Optional helper text shown below the input (muted) */
+  help?: string;
 }
 
 export function DigitFormInput({
@@ -22,6 +24,7 @@ export function DigitFormInput({
   type = 'text',
   disabled = false,
   className,
+  help,
   ...inputProps
 }: DigitFormInputProps) {
   // Auto-coerce number inputs so the form value is a number, not a string
@@ -70,6 +73,9 @@ export function DigitFormInput({
         >
           {errorMessage}
         </p>
+      )}
+      {!hasError && help && (
+        <p className="mt-1 text-xs text-muted-foreground">{help}</p>
       )}
     </div>
   );

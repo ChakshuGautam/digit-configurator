@@ -102,8 +102,8 @@ export const mdmsService = {
     return this.create(tenantId, MDMS_SCHEMAS.DESIGNATION, designation.code, {
       code: designation.code,
       name: designation.name,
-      description: designation.name,
-      department: designation.department ? [designation.department] : [],
+      description: designation.description,
+      department: designation.department,
       active: designation.active,
     });
   },
@@ -142,7 +142,8 @@ export const mdmsService = {
 
     return results.map((r) => ({
       serviceCode: r.serviceCode as string,
-      serviceName: (r.serviceName || r.name) as string,
+      name: (r.name || r.serviceName) as string,
+      keywords: (r.keywords as string) || '',
       department: r.department as string,
       slaHours: r.slaHours as number,
       menuPath: r.menuPath as string | undefined,
@@ -161,8 +162,8 @@ export const mdmsService = {
       complaintType.serviceCode,
       {
         serviceCode: complaintType.serviceCode,
-        name: complaintType.serviceName,
-        keywords: complaintType.serviceName.toLowerCase(),
+        name: complaintType.name,
+        keywords: complaintType.keywords,
         department: complaintType.department,
         slaHours: complaintType.slaHours,
         menuPath: complaintType.menuPath || 'Complaint',
@@ -217,11 +218,16 @@ export const mdmsService = {
   },
 
   async createTenant(stateTenantId: string, tenant: Tenant): Promise<MdmsRecord> {
-    // Build the full tenant data structure matching MDMS schema
+    // Build the full tenant data structure matching MDMS schema.
+    // tenant.tenants requires `tenantId` inside data (in addition to the
+    // Mdms.tenantId wrapper) — it stores the *parent* tenant this city lives
+    // under, e.g. for `ke.testzone` the parent is `ke`. Setting it to the
+    // tenant's own code (as the previous implementation did) is semantically
+    // wrong — MDMS inheritance relies on this being the parent.
     const tenantData = {
+      tenantId: stateTenantId,
       code: tenant.code,
       name: tenant.name,
-      tenantId: tenant.code,
       type: tenant.city?.ulbGrade || 'CITY',
       description: tenant.description || tenant.name,
       logoId: tenant.logoId || null,

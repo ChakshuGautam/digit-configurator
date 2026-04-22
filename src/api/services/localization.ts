@@ -111,27 +111,28 @@ export const localizationService = {
     ];
   },
 
-  // Create localization for a complaint type
+  // Create localization for a complaint type.
+  // We emit both the verbatim code and an uppercase variant for back-compat
+  // with consumers that lowercase/uppercase the serviceCode before lookup.
+  // Deduped so an already-uppercase serviceCode doesn't produce two identical
+  // rows — the backend's upsert rejects the whole batch on
+  // core.DUPLICATE_MESSAGE_IDENTITY when it sees the repeat.
   buildComplaintTypeLocalizations(
     _tenantId: string,
     serviceCode: string,
-    serviceName: string,
+    name: string,
     locale: string = 'en_IN'
   ): LocalizationMessage[] {
-    return [
-      {
-        code: `SERVICEDEFS.${serviceCode}`,
-        message: serviceName,
-        module: 'rainmaker-pgr',
-        locale,
-      },
-      {
-        code: `SERVICEDEFS.${serviceCode.toUpperCase()}`,
-        message: serviceName,
-        module: 'rainmaker-pgr',
-        locale,
-      },
-    ];
+    const codes = new Set<string>([
+      `SERVICEDEFS.${serviceCode}`,
+      `SERVICEDEFS.${serviceCode.toUpperCase()}`,
+    ]);
+    return Array.from(codes).map((code) => ({
+      code,
+      message: name,
+      module: 'rainmaker-pgr',
+      locale,
+    }));
   },
 
   // Create localization for a boundary
@@ -201,11 +202,11 @@ export const localizationService = {
   // Upload localizations for all complaint types
   async uploadComplaintTypeLocalizations(
     tenantId: string,
-    types: { serviceCode: string; serviceName: string }[],
+    types: { serviceCode: string; name: string }[],
     locale: string = 'en_IN'
   ): Promise<{ success: number; failed: number }> {
     const messages = types.flatMap((t) =>
-      this.buildComplaintTypeLocalizations(tenantId, t.serviceCode, t.serviceName, locale)
+      this.buildComplaintTypeLocalizations(tenantId, t.serviceCode, t.name, locale)
     );
     return this.upsertMessages(tenantId, locale, messages);
   },

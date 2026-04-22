@@ -112,6 +112,15 @@ export default function Phase3Page() {
 
     try {
       // Create departments
+      // Track outcomes locally — React state updates don't reflect into the
+      // captured variable until the next render, so reading createdDepts /
+      // createdDesigs / createdComplaints inside this same async block always
+      // returns 0 (the initial state). The toast strings below need the real
+      // counts from this run, hence the local mirrors.
+      let deptsCreated = 0;
+      let desigsCreated = 0;
+      let complaintsCreated = 0;
+
       if (departments.length > 0) {
         setProgressMessage('Creating departments...');
         const deptResults = await mdmsService.createDepartments(
@@ -122,7 +131,8 @@ export default function Phase3Page() {
             active: d.active,
           }))
         );
-        setCreatedDepts(deptResults.success.length);
+        deptsCreated = deptResults.success.length;
+        setCreatedDepts(deptsCreated);
 
         // Create localizations for departments
         await localizationService.uploadDepartmentLocalizations(
@@ -142,11 +152,13 @@ export default function Phase3Page() {
           designations.map(d => ({
             code: d.code,
             name: d.name,
+            description: d.description,
             department: d.department,
             active: d.active,
           }))
         );
-        setCreatedDesigs(desigResults.success.length);
+        desigsCreated = desigResults.success.length;
+        setCreatedDesigs(desigsCreated);
 
         // Create localizations for designations
         await localizationService.uploadDesignationLocalizations(
@@ -158,7 +170,7 @@ export default function Phase3Page() {
         setProgress(60);
       }
 
-      addUndo('create_departments', `Created ${createdDepts} departments and ${createdDesigs} designations`);
+      addUndo('create_departments', `Created ${deptsCreated} departments and ${desigsCreated} designations`);
 
       // Switch to complaint types
       setStep('creating-complaints');
@@ -171,20 +183,22 @@ export default function Phase3Page() {
           state.tenant,
           complaintTypes.map(ct => ({
             serviceCode: ct.serviceCode,
-            serviceName: ct.serviceName,
+            name: ct.name,
+            keywords: ct.keywords,
             department: ct.department,
             slaHours: ct.slaHours,
             active: ct.active,
           }))
         );
-        setCreatedComplaints(complaintResults.success.length);
+        complaintsCreated = complaintResults.success.length;
+        setCreatedComplaints(complaintsCreated);
 
         // Create localizations for complaint types
         await localizationService.uploadComplaintTypeLocalizations(
           state.tenant,
           complaintTypes.map(ct => ({
             serviceCode: ct.serviceCode,
-            serviceName: ct.serviceName,
+            name: ct.name,
           })),
           'en_IN'
         );
@@ -192,7 +206,7 @@ export default function Phase3Page() {
         setProgress(100);
       }
 
-      addUndo('create_complaints', `Created ${createdComplaints} complaint types`);
+      addUndo('create_complaints', `Created ${complaintsCreated} complaint types`);
       setStep('complete');
     } catch (err) {
       console.error('MDMS creation error:', err);
@@ -491,7 +505,7 @@ export default function Phase3Page() {
                               </Badge>
                             </TableCell>
                             <TableCell className="font-mono text-xs sm:text-sm">{type.serviceCode}</TableCell>
-                            <TableCell className="text-xs sm:text-sm">{type.serviceName}</TableCell>
+                            <TableCell className="text-xs sm:text-sm">{type.name}</TableCell>
                             <TableCell className="text-xs sm:text-sm">{type.slaHours}h</TableCell>
                             <TableCell className="font-mono text-xs sm:text-sm">{type.department}</TableCell>
                           </TableRow>
@@ -585,7 +599,7 @@ export default function Phase3Page() {
                 ) : (
                   <Loader2 className="w-4 h-4 text-primary animate-spin" />
                 )}
-                <span>{type.serviceCode} - {type.serviceName}</span>
+                <span>{type.serviceCode} - {type.name}</span>
               </div>
             ))}
             {complaintTypes.length > 5 && (

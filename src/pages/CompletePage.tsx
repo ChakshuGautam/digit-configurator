@@ -1,14 +1,74 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../App';
-import { PartyPopper, Check, ExternalLink, RotateCcw, History, LogOut } from 'lucide-react';
+import { PartyPopper, Check, ExternalLink, RotateCcw, History, LogOut, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DigitCard } from '@/components/digit/DigitCard';
 import { SubmitBar } from '@/components/digit/SubmitBar';
+import { mdmsService, boundaryService, hrmsService } from '@/api';
+
+interface TenantSummary {
+  loading: boolean;
+  error: string | null;
+  departments: number;
+  designations: number;
+  complaintTypes: number;
+  boundaries: number;
+  employees: number;
+}
+
+const INITIAL_SUMMARY: TenantSummary = {
+  loading: true,
+  error: null,
+  departments: 0,
+  designations: 0,
+  complaintTypes: 0,
+  boundaries: 0,
+  employees: 0,
+};
 
 export default function CompletePage() {
   const { state, logout } = useApp();
   const navigate = useNavigate();
+  const [summary, setSummary] = useState<TenantSummary>(INITIAL_SUMMARY);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        // Fetch in parallel; swallow per-resource errors so one broken
+        // endpoint doesn't zero out the whole summary.
+        const [departments, designations, complaintTypes, boundaries, employees] = await Promise.all([
+          mdmsService.getDepartments(state.tenant).catch(() => [] as unknown[]),
+          mdmsService.getDesignations(state.tenant).catch(() => [] as unknown[]),
+          mdmsService.getComplaintTypes(state.tenant).catch(() => [] as unknown[]),
+          boundaryService.searchBoundaries(state.tenant).catch(() => [] as unknown[]),
+          hrmsService.searchEmployees(state.tenant).catch(() => [] as unknown[]),
+        ]);
+        if (cancelled) return;
+        setSummary({
+          loading: false,
+          error: null,
+          departments: departments.length,
+          designations: designations.length,
+          complaintTypes: complaintTypes.length,
+          boundaries: boundaries.length,
+          employees: employees.length,
+        });
+      } catch (err) {
+        if (cancelled) return;
+        setSummary((prev) => ({
+          ...prev,
+          loading: false,
+          error: err instanceof Error ? err.message : 'Failed to load summary',
+        }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [state.tenant]);
 
   const handleLogout = () => {
     logout();
@@ -19,6 +79,16 @@ export default function CompletePage() {
     // In real app, would reset state
     navigate('/phase/1');
   };
+
+  // Render helper: "…" while loading, otherwise the count.
+  const cell = (value: number, suffix: string) =>
+    summary.loading ? (
+      <span className="inline-flex items-center gap-1 text-muted-foreground">
+        <Loader2 className="w-3 h-3 animate-spin" /> loading
+      </span>
+    ) : (
+      `${value} ${suffix}`
+    );
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -68,28 +138,40 @@ export default function CompletePage() {
                 <TableHeader>
                   <TableRow className="bg-muted/50">
                     <TableHead className="text-xs sm:text-sm font-condensed">Phase</TableHead>
-                    <TableHead className="text-xs sm:text-sm font-condensed">Items Created</TableHead>
+                    <TableHead className="text-xs sm:text-sm font-condensed">Records at tenant</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   <TableRow>
                     <TableCell className="text-xs sm:text-sm">Phase 1: Tenant & Branding</TableCell>
-                    <TableCell className="text-primary text-xs sm:text-sm font-medium">1 tenant, branding configured</TableCell>
+                    <TableCell className="text-primary text-xs sm:text-sm font-medium">{state.tenant}</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell className="text-xs sm:text-sm">Phase 2: Boundary Setup</TableCell>
-                    <TableCell className="text-primary text-xs sm:text-sm font-medium">13 boundaries (ADMIN hierarchy)</TableCell>
+                    <TableCell className="text-primary text-xs sm:text-sm font-medium">{cell(summary.boundaries, 'boundaries')}</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell className="text-xs sm:text-sm">Phase 3: Common Masters</TableCell>
-                    <TableCell className="text-primary text-xs sm:text-sm font-medium">3 depts, 5 desigs, 5 complaint types</TableCell>
+                    <TableCell className="text-primary text-xs sm:text-sm font-medium">
+                      {summary.loading ? (
+                        <span className="inline-flex items-center gap-1 text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin" /> loading</span>
+                      ) : (
+                        `${summary.departments} depts, ${summary.designations} desigs, ${summary.complaintTypes} complaint types`
+                      )}
+                    </TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell className="text-xs sm:text-sm">Phase 4: Employees</TableCell>
-                    <TableCell className="text-primary text-xs sm:text-sm font-medium">4 employees with user accounts</TableCell>
+                    <TableCell className="text-primary text-xs sm:text-sm font-medium">{cell(summary.employees, 'employees')}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
+              {summary.error && (
+                <p className="text-xs text-destructive mt-2">Failed to load counts: {summary.error}</p>
+              )}
+              <p className="text-[11px] text-muted-foreground mt-2">
+                Counts reflect the current total at tenant <code>{state.tenant}</code> — including any data present from earlier setup sessions. To see only what this walk created, browse the Management UI and filter by code prefix.
+              </p>
             </div>
           </div>
         </div>
@@ -101,12 +183,34 @@ export default function CompletePage() {
             <strong className="text-sm font-condensed">Your complaints management system is ready!</strong>
           </div>
           <ul className="text-xs sm:text-sm space-y-1 sm:space-y-2 text-foreground">
-            <li>• Employees can login at <strong className="break-all text-primary">{state.environment.replace('https://', '')}</strong></li>
+            <li>
+              • Employees can login at{' '}
+              <a
+                href={`${state.environment}/digit-ui/employee/user/login`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="break-all text-primary underline hover:opacity-80"
+              >
+                {state.environment.replace(/^https?:\/\//, '')}/digit-ui/employee/user/login
+              </a>
+            </li>
+            <li>
+              • Citizens can file complaints at{' '}
+              <a
+                href={`${state.environment}/digit-ui/citizen`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="break-all text-primary underline hover:opacity-80"
+              >
+                {state.environment.replace(/^https?:\/\//, '')}/digit-ui/citizen
+              </a>
+            </li>
             <li>• Access complaint management based on their roles</li>
             <li>• Handle complaints in their assigned jurisdictions</li>
           </ul>
           <p className="mt-3 sm:mt-4 pt-3 border-t border-success/20 text-xs sm:text-sm">
-            <strong>Default credentials:</strong> username / <code className="bg-muted px-1 rounded text-primary">eGov@123</code>
+            <strong>Default credentials:</strong> the employee's <em>code</em> (e.g. <code className="bg-muted px-1 rounded text-primary">TEST_EMP_001</code>) as username, password{' '}
+            <code className="bg-muted px-1 rounded text-primary">eGov@123</code>. HRMS overrides the supplied <code className="bg-muted px-1 rounded">userName</code> with the employee code on create — that's the value that actually authenticates.
           </p>
         </div>
 

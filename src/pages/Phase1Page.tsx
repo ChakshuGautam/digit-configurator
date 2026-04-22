@@ -37,6 +37,37 @@ interface BrandingData {
   stateLogo?: string;
 }
 
+// User-facing copy for each branding asset. Keys mirror BrandingData so the
+// row renderer can iterate this list directly. Labels and descriptions are
+// what the user sees — the camelCase keys above are the wire / MDMS field
+// names and never appear in the UI now.
+const BRANDING_FIELDS: ReadonlyArray<{
+  key: keyof BrandingData;
+  label: string;
+  description: string;
+}> = [
+  {
+    key: 'logoUrl',
+    label: 'Header logo',
+    description: 'Top-left logo on every employee and citizen screen. Recommended: PNG with transparent background, at least 300 px wide.',
+  },
+  {
+    key: 'logoUrlWhite',
+    label: 'Header logo — dark mode',
+    description: 'Same logo, but light/white pixels for use on dark headers (e.g. dashboard mode). Same dimensions as the header logo.',
+  },
+  {
+    key: 'bannerUrl',
+    label: 'Citizen-portal banner',
+    description: 'Hero image at the top of the citizen-facing home page. Recommended: 1920 × 480 JPG.',
+  },
+  {
+    key: 'stateLogo',
+    label: 'County / state emblem',
+    description: 'Appears on PDF receipts and printed correspondence. SVG preferred so it scales cleanly.',
+  },
+];
+
 export default function Phase1Page() {
   const { completePhase, addUndo, state } = useApp();
   const navigate = useNavigate();
@@ -49,6 +80,9 @@ export default function Phase1Page() {
   // Parsed data
   const [tenantData, setTenantData] = useState<TenantExcelRow | null>(null);
   const [brandingData, setBrandingData] = useState<BrandingData>({});
+  // Per-row error so a bad upload surfaces inline next to the failed row,
+  // not at the top of the page where users miss it.
+  const [brandingErrors, setBrandingErrors] = useState<Partial<Record<keyof BrandingData, string>>>({});
   const [validation, setValidation] = useState<ValidationResult | null>(null);
 
   // Created tenant
@@ -162,21 +196,29 @@ export default function Phase1Page() {
   };
 
   const handleBrandingFileUpload = async (type: keyof BrandingData, file: File) => {
+    // Clear any prior error for this row before retrying.
+    setBrandingErrors(prev => ({ ...prev, [type]: undefined }));
     setLoading(true);
     setError(null);
 
-    try {
-      // Upload file to filestore
-      const result = await apiClient.uploadFile(file, 'branding');
-
-      // Update branding data with filestore ID
-      setBrandingData(prev => ({
+    // Basic client-side guard so users see the obvious cases instantly
+    // instead of waiting for a filestore round-trip.
+    if (!file.type.startsWith('image/')) {
+      setBrandingErrors(prev => ({
         ...prev,
-        [type]: result.fileStoreId,
+        [type]: `Expected an image file, got "${file.type || 'unknown'}".`,
       }));
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const result = await apiClient.uploadFile(file, 'branding');
+      setBrandingData(prev => ({ ...prev, [type]: result.fileStoreId }));
     } catch (err) {
       console.error('File upload error:', err);
-      setError('Failed to upload file. Please try again.');
+      const msg = err instanceof Error ? err.message : 'Upload failed';
+      setBrandingErrors(prev => ({ ...prev, [type]: msg }));
     } finally {
       setLoading(false);
     }
@@ -203,14 +245,14 @@ export default function Phase1Page() {
       'District Name',
     ];
     const tenantSample = [
-      'City A ULB',
-      'PG.CITYA',
-      'City',
-      'https://example.com/logo.png',
-      '28.6139',
-      '77.2090',
-      'City A',
-      'District A',
+      'My City Council',                       // Tenant Display Name*
+      'ke.mycity',                             // Tenant Code* — convention: <root>.<city>, lowercase
+      'City',                                  // Tenant Type*
+      '',                                      // Logo File Path* — leave blank to upload in Step 1.2
+      '-1.2921',                               // Latitude — example: Nairobi
+      '36.8219',                               // Longitude
+      'My City',                               // City Name
+      'My District',                           // District Name
     ];
     const tenantData = [tenantHeaders, tenantSample];
     const tenantSheet = XLSX.utils.aoa_to_sheet(tenantData);
@@ -222,14 +264,12 @@ export default function Phase1Page() {
     ];
     XLSX.utils.book_append_sheet(wb, tenantSheet, 'Tenant Info');
 
-    // Tenant Branding Details sheet
+    // Tenant Branding Details sheet — kept for back-compat. The recommended
+    // path now is to upload images in Step 1.2 (filestore IDs are auto-filled).
+    // Leaving these blank in the template is fine; only fill in if you have
+    // pre-existing public URLs you want to reuse.
     const brandingHeaders = ['Banner URL', 'Logo URL', 'Logo URL (White)', 'State Logo'];
-    const brandingSample = [
-      'https://example.com/banner.png',
-      'https://example.com/logo.png',
-      'https://example.com/logo-white.png',
-      'https://example.com/state-logo.png',
-    ];
+    const brandingSample = ['', '', '', ''];
     const brandingData = [brandingHeaders, brandingSample];
     const brandingSheet = XLSX.utils.aoa_to_sheet(brandingData);
     brandingSheet['!cols'] = [{ wch: 35 }, { wch: 35 }, { wch: 35 }, { wch: 35 }];
@@ -474,13 +514,13 @@ export default function Phase1Page() {
               </div>
             </TabsContent>
             <TabsContent value="branding">
-              {Object.keys(brandingData).some(k => brandingData[k as keyof BrandingData]) ? (
+              {BRANDING_FIELDS.some(({ key }) => brandingData[key]) ? (
                 <div className="space-y-2">
-                  {Object.entries(brandingData).map(([key, value]) => value && (
+                  {BRANDING_FIELDS.map(({ key, label }) => brandingData[key] && (
                     <div key={key} className="flex items-center gap-2 text-sm">
                       <Image className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
-                      <span className="font-medium truncate">{value}</span>
+                      <span className="text-muted-foreground">{label}:</span>
+                      <span className="font-medium truncate">{brandingData[key]}</span>
                     </div>
                   ))}
                 </div>
@@ -542,56 +582,70 @@ export default function Phase1Page() {
             <p className="text-sm sm:text-base text-muted-foreground">Created: {createdTenant.code} ({createdTenant.name})</p>
           </div>
 
-          <SubHeader>Step 1.2: State Branding Configuration</SubHeader>
+          <SubHeader>Step 1.2: Branding assets</SubHeader>
+          <p className="text-xs sm:text-sm text-muted-foreground -mt-2 mb-4">
+            Upload the images that appear on the citizen and employee portals for this tenant. All four are optional — leave any blank to fall back to DIGIT defaults.
+          </p>
 
           <div className="grid gap-3 sm:gap-4">
-            {(['bannerUrl', 'logoUrl', 'logoUrlWhite', 'stateLogo'] as const).map((key) => (
-              <div key={key} className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 border border-border rounded bg-card">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-muted rounded flex items-center justify-center flex-shrink-0">
-                  {brandingData[key] ? (
-                    <Check className="w-5 h-5 sm:w-6 sm:h-6 text-success" />
-                  ) : (
-                    <Image className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground" />
-                  )}
+            {BRANDING_FIELDS.map(({ key, label, description }) => {
+              const uploaded = brandingData[key];
+              const rowError = brandingErrors[key];
+              return (
+                <div key={key} className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 border border-border rounded bg-card">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-muted rounded flex items-center justify-center flex-shrink-0">
+                    {uploaded ? (
+                      <Check className="w-5 h-5 sm:w-6 sm:h-6 text-success" />
+                    ) : (
+                      <Image className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground text-sm sm:text-base">{label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1 truncate">
+                      {uploaded ? <>Uploaded ✓ <span className="font-mono text-[11px]">(filestore id: {uploaded})</span></> : 'Not uploaded'}
+                    </p>
+                    {rowError && (
+                      <p className="text-xs text-destructive mt-1 flex items-start gap-1">
+                        <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                        <span>{rowError}</span>
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    {uploaded && (
+                      <Button variant="outline" size="sm" className="hidden sm:flex border-primary text-primary hover:bg-primary/10">
+                        <Eye className="w-4 h-4 mr-1" />
+                        Preview
+                      </Button>
+                    )}
+                    <label className="cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleBrandingFileUpload(key, file);
+                        }}
+                      />
+                      <Button variant="outline" size="sm" asChild className="border-primary text-primary hover:bg-primary/10">
+                        <span>
+                          <Upload className="w-4 h-4 mr-1" />
+                          {uploaded ? 'Replace' : 'Upload'}
+                        </span>
+                      </Button>
+                    </label>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-foreground text-sm sm:text-base">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
-                  <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                    {brandingData[key] || 'Not uploaded'}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  {brandingData[key] && (
-                    <Button variant="outline" size="sm" className="hidden sm:flex border-primary text-primary hover:bg-primary/10">
-                      <Eye className="w-4 h-4 mr-1" />
-                      Preview
-                    </Button>
-                  )}
-                  <label className="cursor-pointer">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleBrandingFileUpload(key, file);
-                      }}
-                    />
-                    <Button variant="outline" size="sm" asChild className="border-primary text-primary hover:bg-primary/10">
-                      <span>
-                        <Upload className="w-4 h-4 mr-1" />
-                        Upload
-                      </span>
-                    </Button>
-                  </label>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <Alert variant="info" className="mt-4">
             <AlertDescription className="text-xs sm:text-sm">
-              Branding is optional. You can skip this step and configure branding later.
+              Branding is optional. You can skip any row and configure these later from Management → Tenants.
             </AlertDescription>
           </Alert>
 
