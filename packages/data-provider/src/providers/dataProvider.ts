@@ -343,12 +343,25 @@ export function createDigitDataProvider(client: DigitApiClient, tenantId: string
             : undefined;
         const q = typeof filter.q === 'string' ? filter.q.trim() : undefined;
 
+        // PGR's RequestSearchCriteria.SortBy is a restricted Java enum
+        // (locality | applicationStatus | serviceRequestId). Anything else
+        // fails Jackson deserialization with a 500. Map our column sources
+        // onto the enum and drop sortBy otherwise — the server's default
+        // ORDER BY ser_createdtime kicks in, which is what the "Created"
+        // column wants anyway.
+        const pgrSortByMap: Record<string, string> = {
+          serviceRequestId: 'serviceRequestId',
+          applicationStatus: 'applicationStatus',
+          'address.locality.code': 'locality',
+          locality: 'locality',
+        };
+        const pgrSortBy = pgrSortByMap[field];
+
         const searchOpts = {
           status: typeof status === 'string' ? status : undefined,
           fromDate,
           toDate,
-          sortBy: field,
-          sortOrder: order,
+          ...(pgrSortBy ? { sortBy: pgrSortBy, sortOrder: order } : { sortOrder: order }),
           limit: perPage,
           offset: (page - 1) * perPage,
         };

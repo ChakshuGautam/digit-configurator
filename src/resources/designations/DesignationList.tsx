@@ -70,28 +70,28 @@ const exportColumns = [
 
 export function DesignationList() {
   return (
-    <div className="space-y-3">
-      <div className="flex justify-end gap-2">
-        <BulkExportButton
-          filename="designations"
-          sheetName="Designation"
-          columns={exportColumns}
-        />
-        <Button asChild variant="outline" size="sm" className="gap-1.5">
-          <Link to="/manage/designations/bulk">
-            <Upload className="w-4 h-4" />
-            Bulk import
-          </Link>
-        </Button>
-      </div>
-      <DigitList
-        title="app.resources.designations"
-        hasCreate
-        sort={{ field: 'code', order: 'ASC' }}
-        filters={filters}
-      >
-        <DigitDatagrid columns={columns} rowClick="show" />
-      </DigitList>
-    </div>
+    <DigitList
+      title="app.resources.designations"
+      hasCreate
+      sort={{ field: 'code', order: 'ASC' }}
+      filters={filters}
+      actions={
+        <>
+          <BulkExportButton
+            filename="designations"
+            sheetName="Designation"
+            columns={exportColumns}
+          />
+          <Button asChild variant="outline" size="sm" className="gap-1.5">
+            <Link to="/manage/designations/bulk">
+              <Upload className="w-4 h-4" />
+              Bulk import
+            </Link>
+          </Button>
+        </>
+      }
+    >
+      <DigitDatagrid columns={columns} rowClick="show" />
+    </DigitList>
   );
 }
