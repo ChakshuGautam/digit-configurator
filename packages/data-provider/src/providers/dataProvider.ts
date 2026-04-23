@@ -612,7 +612,24 @@ export function createDigitDataProvider(client: DigitApiClient, tenantId: string
         return { data: normalizeMdmsRecord(updated, config) };
       }
       if (config.type === 'hrms') {
-        const [employee] = await client.employeeUpdate(tenantId, [params.data as Record<string, unknown>]);
+        // normalizeRecord overwrote the native numeric `id` with the
+        // uuid string (idField: 'uuid') so react-admin can route by it,
+        // but HRMS's Employee POJO has `id: Long` — sending a string
+        // back makes Jackson throw JsonMappingException (closes #439).
+        // Re-fetch the server record, strip the react-admin `id`, and
+        // merge the form payload onto it so the native Long id (plus
+        // any nested arrays the form never rendered) round-trip intact.
+        const data = params.data as Record<string, unknown>;
+        const uuid = typeof data.uuid === 'string' && data.uuid
+          ? data.uuid
+          : String(params.id);
+        const fetched = await client.employeeSearch(tenantId, { uuids: [uuid] });
+        if (!fetched.length) throw new Error(`Employee not found: ${uuid}`);
+        const base = fetched[0] as Record<string, unknown>;
+        const { id: _stringId, ...rest } = data;
+        void _stringId;
+        const merged: Record<string, unknown> = { ...base, ...rest };
+        const [employee] = await client.employeeUpdate(tenantId, [merged]);
         return { data: normalizeRecord(employee, config) };
       }
       if (config.type === 'pgr') {
