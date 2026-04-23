@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { DigitFormSelect } from './DigitFormSelect';
 
 interface WorkflowState {
+  uuid?: string;
   state: string | null;
   applicationStatus: string | null;
   isStartState?: boolean;
@@ -35,7 +36,10 @@ export interface WorkflowActionSelectProps extends InputProps {
   className?: string;
 }
 
-/** Human-readable labels for PGR workflow actions */
+/** Human-readable labels for PGR workflow actions. Superset of the actions
+ *  observed in the live `egov-workflow-v2/businessservice` PGR config
+ *  (probed 2026-04-23): APPLY, ASSIGN, REASSIGN, RESOLVE, REJECT, REOPEN,
+ *  RATE, ESCALATE, COMMENT, SLA_ESCALATE. */
 const ACTION_LABELS: Record<string, string> = {
   APPLY: 'Submit',
   ASSIGN: 'Assign to Employee',
@@ -44,17 +48,23 @@ const ACTION_LABELS: Record<string, string> = {
   REJECT: 'Reject',
   REOPEN: 'Reopen',
   RATE: 'Rate & Close',
+  ESCALATE: 'Escalate',
+  COMMENT: 'Add Comment',
+  SLA_ESCALATE: 'SLA Escalation (auto)',
 };
 
-/** Human-readable labels for PGR states */
+/** Human-readable labels for PGR states — covers the full 11-state machine. */
 const STATE_LABELS: Record<string, string> = {
   PENDINGFORASSIGNMENT: 'Pending Assignment',
   PENDINGFORREASSIGNMENT: 'Pending Reassignment',
   PENDINGATLME: 'Pending at LME',
+  PENDINGATSUPERVISOR: 'Pending at Supervisor',
   RESOLVED: 'Resolved',
+  RESOLVEDBYSUPERVISOR: 'Resolved by Supervisor',
   REJECTED: 'Rejected',
   CLOSEDAFTERRESOLUTION: 'Closed (Resolved)',
   CLOSEDAFTERREJECTION: 'Closed (Rejected)',
+  CANCELLED: 'Cancelled',
 };
 
 /** Actions that require selecting an assignee */
@@ -108,13 +118,24 @@ export function WorkflowActionSelect({
       return { currentState: null, availableActions: [], isTerminal: false };
     }
 
-    const actions = (state.actions ?? []).map((a) => ({
-      value: a.action,
-      label: ACTION_LABELS[a.action] ?? a.action,
-      nextState: a.nextState,
-      nextStateLabel: STATE_LABELS[a.nextState] ?? a.nextState,
-      roles: a.roles,
-    }));
+    // `nextState` on an action references the target state's *uuid*, not the
+    // applicationStatus label. Build a uuid→status map from workflowDef so
+    // operators see "→ Pending at LME" instead of a raw UUID in the dropdown.
+    const byUuid = new Map<string, string>();
+    for (const s of states) {
+      if (s.uuid && s.applicationStatus) byUuid.set(s.uuid, s.applicationStatus);
+    }
+
+    const actions = (state.actions ?? []).map((a) => {
+      const nextStatus = byUuid.get(a.nextState) ?? a.nextState;
+      return {
+        value: a.action,
+        label: ACTION_LABELS[a.action] ?? a.action,
+        nextState: nextStatus,
+        nextStateLabel: STATE_LABELS[nextStatus] ?? nextStatus,
+        roles: a.roles,
+      };
+    });
 
     return {
       currentState: state,
