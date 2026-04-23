@@ -1,7 +1,22 @@
-import { DigitList, DigitDatagrid } from '@/admin';
+import { DigitList, DigitDatagrid, SearchFilterInput, SelectFilterInput } from '@/admin';
 import type { DigitColumn } from '@/admin';
 import { StatusChip } from '@/admin/fields';
 import { Badge } from '@/components/ui/badge';
+
+const filters = [
+  <SearchFilterInput key="q" source="q" alwaysOn />,
+  <SelectFilterInput
+    key="userType"
+    source="userType"
+    label="Type"
+    choices={[
+      { id: 'CITIZEN', name: 'Citizen' },
+      { id: 'EMPLOYEE', name: 'Employee' },
+      { id: 'SYSTEM', name: 'System' },
+    ]}
+    alwaysOn
+  />,
+];
 
 const columns: DigitColumn[] = [
   { source: 'userName', label: 'app.fields.username' },
@@ -37,7 +52,7 @@ const columns: DigitColumn[] = [
 
 export function UserList() {
   return (
-    <DigitList title="app.resources.users" hasCreate sort={{ field: 'userName', order: 'ASC' }}>
+    <DigitList title="app.resources.users" hasCreate sort={{ field: 'userName', order: 'ASC' }} filters={filters}>
       <DigitDatagrid columns={columns} rowClick="show" />
     </DigitList>
   );

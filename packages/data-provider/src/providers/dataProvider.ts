@@ -198,8 +198,16 @@ async function localizationGetList(client: DigitApiClient, config: ResourceConfi
 
 async function userGetList(client: DigitApiClient, config: ResourceConfig, tenantId: string, filter?: Record<string, unknown>): Promise<RaRecord[]> {
   const opts: { userName?: string; mobileNumber?: string; uuid?: string[]; roleCodes?: string[]; userType?: string; limit: number } = { limit: 100 };
-  if (filter?.userName) opts.userName = String(filter.userName);
-  if (filter?.mobileNumber) opts.mobileNumber = String(filter.mobileNumber);
+  // `q` is a single-input "quick search". Digits (optionally +/0-prefixed, with spaces or
+  // dashes) route to mobileNumber; anything else routes to userName. Explicit field
+  // filters below can still override if both are present.
+  const q = typeof filter?.q === 'string' ? filter.q.trim() : '';
+  if (q) {
+    if (/^[+\d][\d\s-]*$/.test(q)) opts.mobileNumber = q.replace(/[\s-]/g, '');
+    else opts.userName = q;
+  }
+  if (!opts.userName && filter?.userName) opts.userName = String(filter.userName);
+  if (!opts.mobileNumber && filter?.mobileNumber) opts.mobileNumber = String(filter.mobileNumber);
   if (filter?.userType) opts.userType = String(filter.userType);
   if (filter?.roleCodes) opts.roleCodes = filter.roleCodes as string[];
   if (filter?.uuid) opts.uuid = Array.isArray(filter.uuid) ? filter.uuid as string[] : [String(filter.uuid)];
