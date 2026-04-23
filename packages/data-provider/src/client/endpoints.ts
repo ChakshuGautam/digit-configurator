@@ -28,6 +28,7 @@ export const ENDPOINTS = {
   PGR_CREATE: '/pgr-services/v2/request/_create',
   PGR_SEARCH: '/pgr-services/v2/request/_search',
   PGR_UPDATE: '/pgr-services/v2/request/_update',
+  PGR_COUNT: '/pgr-services/v2/request/_count',
   WORKFLOW_BUSINESS_SERVICE_SEARCH: '/egov-workflow-v2/egov-wf/businessservice/_search',
   WORKFLOW_BUSINESS_SERVICE_CREATE: '/egov-workflow-v2/egov-wf/businessservice/_create',
   WORKFLOW_PROCESS_SEARCH: '/egov-workflow-v2/egov-wf/process/_search',

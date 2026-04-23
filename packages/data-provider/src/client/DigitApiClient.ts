@@ -431,6 +431,20 @@ export class DigitApiClient {
     return data.ServiceWrappers || [];
   }
 
+  async pgrCount(tenantId: string, options?: {
+    status?: string; fromDate?: number; toDate?: number;
+  }): Promise<number> {
+    const params = new URLSearchParams({ tenantId });
+    if (options?.status) params.append('applicationStatus', options.status);
+    if (options?.fromDate) params.append('fromDate', String(options.fromDate));
+    if (options?.toDate) params.append('toDate', String(options.toDate));
+    const data = await this.request<{ count?: number }>(
+      `${this.endpoint('PGR_COUNT')}?${params.toString()}`,
+      { RequestInfo: this.buildRequestInfo() },
+    );
+    return typeof data.count === 'number' ? data.count : 0;
+  }
+
   async pgrCreate(tenantId: string, serviceCode: string, description: string, address: Record<string, unknown>, citizen?: Record<string, unknown>): Promise<Record<string, unknown>> {
     const citizenInfo = citizen || (this.userInfo ? {
       mobileNumber: this.userInfo.mobileNumber || '0000000000', name: this.userInfo.name, type: 'CITIZEN',
