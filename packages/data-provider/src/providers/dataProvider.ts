@@ -271,8 +271,25 @@ async function mdmsSchemaGetList(client: DigitApiClient, config: ResourceConfig,
 }
 
 async function boundaryHierarchyGetList(client: DigitApiClient, config: ResourceConfig, tenantId: string): Promise<RaRecord[]> {
-  const hierarchies = await client.boundaryHierarchySearch(tenantId);
-  return hierarchies.map((h) => normalizeRecord(h, config));
+  // Fetch the session tenant's hierarchies first. When at state level,
+  // aggregate city-tenant hierarchies too — the boundary service stores each
+  // tenant's definition separately (no cross-tenant inheritance) so a
+  // ke.nairobi ADMIN hierarchy is invisible from a ke session otherwise.
+  const rootHierarchies = await client.boundaryHierarchySearch(tenantId).catch(() => []);
+  let all = rootHierarchies;
+  if (!tenantId.includes('.')) {
+    const tenantRecords = await client.mdmsSearch(tenantId, 'tenant.tenants', { limit: 200 });
+    const cityTenants = tenantRecords
+      .filter((r) => r.isActive && r.data?.code && String(r.data.code).startsWith(`${tenantId}.`))
+      .map((r) => String(r.data.code));
+    if (cityTenants.length > 0) {
+      const cityResults = await Promise.all(
+        cityTenants.map((ct) => client.boundaryHierarchySearch(ct).catch(() => [])),
+      );
+      all = [...rootHierarchies, ...cityResults.flat()];
+    }
+  }
+  return all.map((h) => normalizeRecord(h, config));
 }
 
 // --- Factory ---
@@ -532,6 +549,29 @@ export function createDigitDataProvider(client: DigitApiClient, tenantId: string
         const data = params.data as Record<string, unknown>;
         const user = await client.userCreate(data, tenantId);
         return { data: normalizeRecord(user, config) };
+      }
+      if (config.type === 'boundary-hierarchy') {
+        const data = params.data as Record<string, unknown>;
+        const hierarchyType = String(data.hierarchyType ?? '').trim();
+        if (!hierarchyType) throw new Error('hierarchyType is required');
+        const levelsInput = Array.isArray(data.boundaryHierarchy) ? data.boundaryHierarchy : [];
+        const levels = levelsInput
+          .map((lvl) => lvl as Record<string, unknown>)
+          .filter((lvl) => typeof lvl?.boundaryType === 'string' && (lvl.boundaryType as string).trim())
+          .map((lvl) => ({
+            boundaryType: String(lvl.boundaryType).trim(),
+            parentBoundaryType:
+              typeof lvl.parentBoundaryType === 'string' && lvl.parentBoundaryType.trim()
+                ? lvl.parentBoundaryType.trim()
+                : null,
+          }));
+        if (levels.length === 0) throw new Error('At least one hierarchy level is required');
+        const created = await client.boundaryHierarchyCreate(
+          tenantId,
+          hierarchyType,
+          levels,
+        );
+        return { data: normalizeRecord(created, config) };
       }
       throw new Error(`Create not supported for resource type: ${config.type}`);
     },
