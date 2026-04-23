@@ -1,5 +1,6 @@
 import { DigitCreate, DigitFormInput, DigitFormSelect, v } from '@/admin';
 import { FieldSection } from '@/admin/fields';
+import { LocalityPicker } from './LocalityPicker';
 import { useApp } from '../../App';
 
 export function ComplaintCreate() {
@@ -43,12 +44,11 @@ export function ComplaintCreate() {
             validate={[v.required, v.minLength(10)]}
             help="What happened? Minimum 10 characters."
           />
-          <DigitFormSelect
+          <LocalityPicker
             source="address.locality.code"
             label="Locality"
-            reference="boundaries"
-            placeholder="Select locality..."
-            validate={v.required}
+            required
+            help="Cascades from hierarchy → boundary type → locality."
           />
           <DigitFormInput source="address.landmark" label="Landmark" />
           <DigitFormInput source="address.pincode" label="Pincode" />

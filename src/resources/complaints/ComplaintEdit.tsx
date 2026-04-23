@@ -1,12 +1,14 @@
 import { DigitEdit, DigitFormInput, DigitFormSelect, WorkflowActionSelect } from '@/admin';
 import { FieldSection } from '@/admin/fields';
+import { LocalityPicker } from './LocalityPicker';
 
+// Aligned with the PGR service's server-side source allow-list — probed
+// 2026-04-23 on naipepea: web / mobile / whatsapp accepted; ivr / phone /
+// counter return INVALID_SOURCE. Extend here only after the server list does.
 const SOURCE_CHOICES = [
   { value: 'web', label: 'Web' },
   { value: 'mobile', label: 'Mobile' },
   { value: 'whatsapp', label: 'WhatsApp' },
-  { value: 'ivr', label: 'IVR' },
-  { value: 'counter', label: 'Counter' },
 ];
 
 export function ComplaintEdit() {
@@ -57,12 +59,7 @@ export function ComplaintEdit() {
 
       <FieldSection title="Address">
         <div className="space-y-4">
-          <DigitFormSelect
-            source="address.locality.code"
-            label="Locality"
-            reference="boundaries"
-            placeholder="Select locality..."
-          />
+          <LocalityPicker source="address.locality.code" label="Locality" />
           <DigitFormInput source="address.landmark" label="Landmark" />
           <DigitFormInput source="address.pincode" label="Pincode" />
           <DigitFormInput source="address.street" label="Street" />

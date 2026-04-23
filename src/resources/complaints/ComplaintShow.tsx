@@ -130,7 +130,25 @@ export function ComplaintShow() {
             </FieldSection>
 
             <FieldSection title="Citizen">
-              <FieldRow label="Name">{String(citizen?.name ?? '--')}</FieldRow>
+              <FieldRow label="Name">
+                {(() => {
+                  const name = citizen?.name ? String(citizen.name) : '';
+                  const mobile = citizen?.mobileNumber ? String(citizen.mobileNumber) : '';
+                  if (!name) return <span className="text-muted-foreground">--</span>;
+                  // When the citizen registered via mobile-only OTP, the
+                  // user-service sets `name = mobileNumber`. Flag that so
+                  // operators don't mistake a phone number for a real name.
+                  if (name === mobile) {
+                    return (
+                      <span>
+                        {name}{' '}
+                        <span className="text-xs text-muted-foreground">(mobile-only account)</span>
+                      </span>
+                    );
+                  }
+                  return name;
+                })()}
+              </FieldRow>
               <FieldRow label="Mobile">{String(citizen?.mobileNumber ?? '--')}</FieldRow>
             </FieldSection>
 
