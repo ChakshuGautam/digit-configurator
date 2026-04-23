@@ -417,11 +417,19 @@ export function createDigitDataProvider(client: DigitApiClient, tenantId: string
       }
       if (config.type === 'pgr') {
         const data = params.data as Record<string, unknown>;
+        // Stamp address.tenantId from the session tenant. Live PGR records
+        // always carry address.tenantId (never address.city, which is nullable
+        // and unused downstream). Operators don't fill this manually.
+        const formAddress = (data.address as Record<string, unknown> | undefined) ?? {};
+        const address: Record<string, unknown> = { ...formAddress, tenantId };
+        if (!address.locality && typeof data['address.locality.code'] === 'string') {
+          address.locality = { code: data['address.locality.code'] };
+        }
         const wrapper = await client.pgrCreate(
           tenantId,
           String(data.serviceCode),
           String(data.description || ''),
-          (data.address || { locality: { code: '' } }) as Record<string, unknown>,
+          address,
           data.citizen as Record<string, unknown> | undefined,
         );
         const service = ((wrapper as Record<string, unknown>).service || wrapper) as Record<string, unknown>;
@@ -487,10 +495,27 @@ export function createDigitDataProvider(client: DigitApiClient, tenantId: string
       if (config.type === 'pgr') {
         const data = params.data as Record<string, unknown>;
         const action = String(data.action || data._action || 'ASSIGN');
-        // Fetch current service state
+        // Fetch current service state — PGR update needs the full object
+        // (auditDetails round-trip, internal UUID, etc.).
         const wrappers = await client.pgrSearch(tenantId, { serviceRequestId: String(params.id) });
         if (!wrappers.length) throw new Error(`Complaint not found: ${params.id}`);
         const service = ((wrappers[0] as Record<string, unknown>).service || wrappers[0]) as Record<string, unknown>;
+
+        // Merge form edits onto the fetched service so description / serviceCode
+        // / source / address changes actually persist. Previously these were
+        // silently dropped — the update path sent the fetched service verbatim
+        // and only the workflow action, comment, assignees, and rating survived.
+        const editableTop = ['serviceCode', 'description', 'source', 'additionalDetail'];
+        for (const key of editableTop) {
+          if (key in data) service[key] = data[key];
+        }
+        if (data.address && typeof data.address === 'object') {
+          service.address = {
+            ...(service.address as Record<string, unknown> | undefined ?? {}),
+            ...(data.address as Record<string, unknown>),
+          };
+        }
+
         // Normalize assignees: accept a single string (from form select) or an array
         let assignees: string[] | undefined;
         if (data.assignee) {
