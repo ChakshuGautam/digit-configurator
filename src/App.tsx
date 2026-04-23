@@ -11,8 +11,8 @@ import { CoreAdminContext, CoreAdminUI, Resource, CustomRoutes } from 'ra-core';
 import { QueryClient } from '@tanstack/react-query';
 import { DigitLayout, DigitDashboard, MdmsResourcePage, MdmsResourceShow, MdmsResourceEdit, MdmsResourceCreate } from '@/admin';
 import {
-  DepartmentList, DepartmentShow, DepartmentEdit, DepartmentCreate,
-  DesignationList, DesignationShow, DesignationEdit, DesignationCreate,
+  DepartmentList, DepartmentShow, DepartmentEdit, DepartmentCreate, DepartmentBulkImport,
+  DesignationList, DesignationShow, DesignationEdit, DesignationCreate, DesignationBulkImport,
   ComplaintTypeList, ComplaintTypeShow, ComplaintTypeEdit, ComplaintTypeCreate,
   TenantList, TenantShow,
   EmployeeList, EmployeeShow, EmployeeEdit, EmployeeCreate, EmployeeBulkImport,
@@ -122,6 +122,8 @@ function ManagementAdmin() {
           <Route path="/advanced" element={<AdvancedPage />} />
           <Route path="/pgr-dashboard" element={<PgrDashboard />} />
           <Route path="/employees/bulk" element={<EmployeeBulkImport />} />
+          <Route path="/departments/bulk" element={<DepartmentBulkImport />} />
+          <Route path="/designations/bulk" element={<DesignationBulkImport />} />
         </CustomRoutes>
       </CoreAdminUI>
     </CoreAdminContext>
