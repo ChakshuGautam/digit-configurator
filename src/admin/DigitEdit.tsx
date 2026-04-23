@@ -1,15 +1,32 @@
 import React from 'react';
-import { EditBase, useEditContext, Form, type TransformData } from 'ra-core';
+import { EditBase, useEditContext, Form, useResourceContext, type TransformData, type RaRecord } from 'ra-core';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
 import { DigitCard } from '@/components/digit/DigitCard';
 import { ActionBar } from '@/components/digit/ActionBar';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/hooks/use-toast';
 import {
   useMutationError,
   MutationErrorBanner,
   type MutationErrorInfo,
 } from './mutationError';
+
+function pickRecordLabel(data: RaRecord | undefined): string {
+  if (!data) return 'Record';
+  const rec = data as unknown as Record<string, unknown>;
+  for (const key of ['name', 'code', 'userName', 'id']) {
+    const v = rec[key];
+    if (typeof v === 'string' && v.trim()) return v;
+  }
+  return 'Record';
+}
+
+function prettyResourceSingular(resource: string | undefined): string {
+  if (!resource) return 'Record';
+  const head = resource.replace(/-/g, ' ').replace(/s$/, '');
+  return head.charAt(0).toUpperCase() + head.slice(1);
+}
 
 export interface DigitEditProps {
   /** Page title */
@@ -142,6 +159,8 @@ function DigitEditContent({
 
 export function DigitEdit({ title, children, resource, id, transform }: DigitEditProps) {
   const { info, capture, clear } = useMutationError();
+  const contextResource = useResourceContext();
+  const effectiveResource = resource ?? contextResource;
   return (
     <EditBase
       resource={resource}
@@ -150,7 +169,14 @@ export function DigitEdit({ title, children, resource, id, transform }: DigitEdi
       transform={transform}
       mutationOptions={{
         onError: (err) => capture(err),
-        onSuccess: () => clear(),
+        onSuccess: (data) => {
+          clear();
+          const label = pickRecordLabel(data);
+          toast({
+            title: `${prettyResourceSingular(effectiveResource)} updated`,
+            description: label !== 'Record' ? label : undefined,
+          });
+        },
       }}
     >
       <DigitEditContent title={title} errorInfo={info} onDismissError={clear}>
