@@ -26,7 +26,7 @@ import {
   WorkflowServiceList, WorkflowServiceShow,
   WorkflowProcessList, WorkflowProcessShow,
   MdmsSchemaList, MdmsSchemaShow,
-  BoundaryHierarchyList, BoundaryHierarchyShow,
+  BoundaryHierarchyList, BoundaryHierarchyShow, BoundaryHierarchyCreate,
   AdvancedPage,
 } from '@/resources';
 import PgrDashboard from './pages/PgrDashboard';
@@ -110,7 +110,7 @@ function ManagementAdmin() {
         <Resource name="workflow-business-services" list={WorkflowServiceList} show={WorkflowServiceShow} />
         <Resource name="workflow-processes" list={WorkflowProcessList} show={WorkflowProcessShow} />
         <Resource name="mdms-schemas" list={MdmsSchemaList} show={MdmsSchemaShow} />
-        <Resource name="boundary-hierarchies" list={BoundaryHierarchyList} show={BoundaryHierarchyShow} />
+        <Resource name="boundary-hierarchies" list={BoundaryHierarchyList} show={BoundaryHierarchyShow} create={BoundaryHierarchyCreate} />
 
         {/* Generic MDMS with Show/Edit/Create (exclude resources with dedicated UI above) */}
         {Object.keys(getGenericMdmsResources()).filter((name) => name !== 'role-actions').map((name) => (

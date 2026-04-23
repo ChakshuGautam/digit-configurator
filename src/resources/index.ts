@@ -50,3 +50,4 @@ export { MdmsSchemaList } from './mdms-schemas/MdmsSchemaList';
 export { MdmsSchemaShow } from './mdms-schemas/MdmsSchemaShow';
 export { BoundaryHierarchyList } from './boundary-hierarchies/BoundaryHierarchyList';
 export { BoundaryHierarchyShow } from './boundary-hierarchies/BoundaryHierarchyShow';
+export { BoundaryHierarchyCreate } from './boundary-hierarchies/BoundaryHierarchyCreate';

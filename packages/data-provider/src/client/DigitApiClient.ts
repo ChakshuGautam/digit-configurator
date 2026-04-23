@@ -311,11 +311,20 @@ export class DigitApiClient {
   }
 
   async boundaryHierarchyCreate(tenantId: string, hierarchyType: string, levels: { boundaryType: string; parentBoundaryType: string | null }[]): Promise<Record<string, unknown>> {
-    const data = await this.request<{ BoundaryHierarchy?: Record<string, unknown> }>(this.endpoint('BOUNDARY_HIERARCHY_CREATE'), {
-      RequestInfo: this.buildRequestInfo(),
-      BoundaryHierarchy: { tenantId, hierarchyType, boundaryHierarchy: levels.map((h) => ({ ...h, active: true })) },
-    });
-    return data.BoundaryHierarchy || {};
+    // Server wraps the created record in a single-element *array* under
+    // `BoundaryHierarchy` despite the request side being a single object.
+    // Accept both shapes so we don't break if a future service version
+    // reverts to the singular form.
+    const data = await this.request<{ BoundaryHierarchy?: Record<string, unknown> | Record<string, unknown>[] }>(
+      this.endpoint('BOUNDARY_HIERARCHY_CREATE'),
+      {
+        RequestInfo: this.buildRequestInfo(),
+        BoundaryHierarchy: { tenantId, hierarchyType, boundaryHierarchy: levels.map((h) => ({ ...h, active: true })) },
+      },
+    );
+    const bh = data.BoundaryHierarchy;
+    if (Array.isArray(bh)) return bh[0] ?? {};
+    return bh ?? {};
   }
 
   async boundaryRelationshipCreate(tenantId: string, code: string, hierarchyType: string, boundaryType: string, parent: string | null): Promise<Record<string, unknown>> {
