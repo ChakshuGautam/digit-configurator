@@ -1,7 +1,10 @@
+import { Link } from 'react-router-dom';
+import { Upload } from 'lucide-react';
 import { DigitList, DigitDatagrid, SearchFilterInput, SelectFilterInput, TextFilterInput } from '@/admin';
 import type { DigitColumn } from '@/admin';
 import { StatusChip } from '@/admin/fields';
 import { EntityLink } from '@/components/ui/EntityLink';
+import { Button } from '@/components/ui/button';
 
 const filters = [
   <SearchFilterInput key="q" source="q" alwaysOn />,
@@ -62,8 +65,18 @@ const columns: DigitColumn[] = [
 
 export function EmployeeList() {
   return (
-    <DigitList title="app.resources.employees" hasCreate sort={{ field: 'code', order: 'ASC' }} filters={filters}>
-      <DigitDatagrid columns={columns} rowClick="show" />
-    </DigitList>
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <Button asChild variant="outline" size="sm" className="gap-1.5">
+          <Link to="/manage/employees/bulk">
+            <Upload className="w-4 h-4" />
+            Bulk import
+          </Link>
+        </Button>
+      </div>
+      <DigitList title="app.resources.employees" hasCreate sort={{ field: 'code', order: 'ASC' }} filters={filters}>
+        <DigitDatagrid columns={columns} rowClick="show" />
+      </DigitList>
+    </div>
   );
 }

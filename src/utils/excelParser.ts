@@ -701,15 +701,9 @@ export function parseEmployeeExcel(workbook: XLSX.WorkBook): {
       return;
     }
 
-    if (!userName) {
-      errors.push({
-        row: index + 2,
-        field: 'userName',
-        message: 'Username is required',
-        code: 'REQUIRED_FIELD',
-      });
-      return;
-    }
+    // userName is optional at parse time — callers (Phase 4, bulk import) derive
+    // `firstname.lastname` from `name` when the Excel cell is blank. Keeping it
+    // required here forced operators to duplicate the name column unnecessarily.
 
     if (!mobileNumber) {
       errors.push({

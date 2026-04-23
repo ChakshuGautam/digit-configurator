@@ -389,7 +389,7 @@ export interface ComplaintTypeExcelRow {
 export interface EmployeeExcelRow {
   employeeCode: string;
   name: string;
-  userName: string;
+  userName?: string;
   mobileNumber: string;
   emailId?: string;
   gender?: string;

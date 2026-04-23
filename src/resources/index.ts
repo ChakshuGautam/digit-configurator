@@ -16,6 +16,7 @@ export { EmployeeList } from './employees/EmployeeList';
 export { EmployeeShow } from './employees/EmployeeShow';
 export { EmployeeEdit } from './employees/EmployeeEdit';
 export { EmployeeCreate } from './employees/EmployeeCreate';
+export { EmployeeBulkImport } from './employees/EmployeeBulkImport';
 export { ComplaintList } from './complaints/ComplaintList';
 export { ComplaintShow } from './complaints/ComplaintShow';
 export { ComplaintEdit } from './complaints/ComplaintEdit';

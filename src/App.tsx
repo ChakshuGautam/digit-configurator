@@ -15,7 +15,7 @@ import {
   DesignationList, DesignationShow, DesignationEdit, DesignationCreate,
   ComplaintTypeList, ComplaintTypeShow, ComplaintTypeEdit, ComplaintTypeCreate,
   TenantList, TenantShow,
-  EmployeeList, EmployeeShow, EmployeeEdit, EmployeeCreate,
+  EmployeeList, EmployeeShow, EmployeeEdit, EmployeeCreate, EmployeeBulkImport,
   ComplaintList, ComplaintShow, ComplaintEdit, ComplaintCreate,
   BoundaryList, BoundaryShow, BoundaryEdit, BoundaryCreate,
   LocalizationList, LocalizationShow, LocalizationEdit, LocalizationCreate,
@@ -121,6 +121,7 @@ function ManagementAdmin() {
         <CustomRoutes>
           <Route path="/advanced" element={<AdvancedPage />} />
           <Route path="/pgr-dashboard" element={<PgrDashboard />} />
+          <Route path="/employees/bulk" element={<EmployeeBulkImport />} />
         </CustomRoutes>
       </CoreAdminUI>
     </CoreAdminContext>
