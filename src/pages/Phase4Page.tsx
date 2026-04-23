@@ -53,6 +53,7 @@ interface ParsedEmployee extends EmployeeExcelRow {
 
 export default function Phase4Page() {
   const { completePhase, addUndo, state } = useApp();
+  const targetTenant = state.targetTenant || state.tenant;
   const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>('landing');
@@ -82,17 +83,17 @@ export default function Phase4Page() {
   // Fetch reference data on mount
   useEffect(() => {
     fetchReferenceData();
-  }, [state.tenant]);
+  }, [targetTenant]);
 
   const fetchReferenceData = async () => {
     setLoadingRefs(true);
     try {
       const [depts, desigs, bounds, fetchedRoles, fetchedMobileRules] = await Promise.all([
-        mdmsService.getDepartments(state.tenant),
-        mdmsService.getDesignations(state.tenant),
-        boundaryService.searchBoundaries(state.tenant),
-        mdmsService.getRoles(state.tenant).catch(() => [] as typeof roles),
-        mdmsService.getMobileValidation(state.tenant).catch(() => null),
+        mdmsService.getDepartments(targetTenant),
+        mdmsService.getDesignations(targetTenant),
+        boundaryService.searchBoundaries(targetTenant),
+        mdmsService.getRoles(targetTenant).catch(() => [] as typeof roles),
+        mdmsService.getMobileValidation(targetTenant).catch(() => null),
       ]);
       setDepartments(depts);
       setDesignations(desigs);
@@ -253,7 +254,7 @@ export default function Phase4Page() {
 
           // Build employee object
           const employee = hrmsService.buildEmployee({
-            tenantId: state.tenant,
+            tenantId: targetTenant,
             code: emp.employeeCode || hrmsService.generateEmployeeCode('EMP', i + 1),
             name: emp.name,
             userName: emp.userName || hrmsService.generateUsername(emp.name),
@@ -327,7 +328,7 @@ export default function Phase4Page() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `employee_credentials_${state.tenant}.csv`;
+    a.download = `employee_credentials_${targetTenant}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -439,7 +440,7 @@ export default function Phase4Page() {
               <strong className="text-sm font-condensed">Template Generated!</strong>
             </div>
             <p className="text-xs sm:text-sm mb-2 text-foreground">
-              Employee_Master_Dynamic_{state.tenant.toUpperCase()}.xlsx
+              Employee_Master_Dynamic_{targetTenant.toUpperCase()}.xlsx
             </p>
 
             <div className="grid grid-cols-2 gap-2 sm:gap-4 text-xs sm:text-sm mb-3 sm:mb-4">
@@ -732,8 +733,8 @@ export default function Phase4Page() {
             }
             info={
               failedCount > 0
-                ? `Tenant: ${state.tenant.toUpperCase()} • Check the failure list below and retry the failed rows.`
-                : `Tenant: ${state.tenant.toUpperCase()}`
+                ? `Tenant: ${targetTenant.toUpperCase()} • Check the failure list below and retry the failed rows.`
+                : `Tenant: ${targetTenant.toUpperCase()}`
             }
           />
 

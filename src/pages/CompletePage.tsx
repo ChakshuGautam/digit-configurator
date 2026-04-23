@@ -30,6 +30,7 @@ const INITIAL_SUMMARY: TenantSummary = {
 
 export default function CompletePage() {
   const { state, logout } = useApp();
+  const targetTenant = state.targetTenant || state.tenant;
   const navigate = useNavigate();
   const [summary, setSummary] = useState<TenantSummary>(INITIAL_SUMMARY);
 
@@ -40,11 +41,11 @@ export default function CompletePage() {
         // Fetch in parallel; swallow per-resource errors so one broken
         // endpoint doesn't zero out the whole summary.
         const [departments, designations, complaintTypes, boundaries, employees] = await Promise.all([
-          mdmsService.getDepartments(state.tenant).catch(() => [] as unknown[]),
-          mdmsService.getDesignations(state.tenant).catch(() => [] as unknown[]),
-          mdmsService.getComplaintTypes(state.tenant).catch(() => [] as unknown[]),
-          boundaryService.searchBoundaries(state.tenant).catch(() => [] as unknown[]),
-          hrmsService.searchEmployees(state.tenant).catch(() => [] as unknown[]),
+          mdmsService.getDepartments(targetTenant).catch(() => [] as unknown[]),
+          mdmsService.getDesignations(targetTenant).catch(() => [] as unknown[]),
+          mdmsService.getComplaintTypes(targetTenant).catch(() => [] as unknown[]),
+          boundaryService.searchBoundaries(targetTenant).catch(() => [] as unknown[]),
+          hrmsService.searchEmployees(targetTenant).catch(() => [] as unknown[]),
         ]);
         if (cancelled) return;
         setSummary({
@@ -68,7 +69,7 @@ export default function CompletePage() {
     return () => {
       cancelled = true;
     };
-  }, [state.tenant]);
+  }, [targetTenant]);
 
   const handleLogout = () => {
     logout();
@@ -119,7 +120,7 @@ export default function CompletePage() {
         <div className="bg-primary/5 border border-primary/20 rounded p-4 sm:p-6 mb-6 sm:mb-8 text-left">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
             <div>
-              <p className="font-condensed font-semibold text-foreground text-sm sm:text-base">Tenant: <span className="text-primary">{state.tenant.toUpperCase()}</span></p>
+              <p className="font-condensed font-semibold text-foreground text-sm sm:text-base">Tenant: <span className="text-primary">{targetTenant.toUpperCase()}</span></p>
               <p className="text-xs sm:text-sm text-muted-foreground truncate">Environment: {state.environment.replace('https://', '')}</p>
             </div>
             <a
@@ -144,7 +145,7 @@ export default function CompletePage() {
                 <TableBody>
                   <TableRow>
                     <TableCell className="text-xs sm:text-sm">Phase 1: Tenant & Branding</TableCell>
-                    <TableCell className="text-primary text-xs sm:text-sm font-medium">{state.tenant}</TableCell>
+                    <TableCell className="text-primary text-xs sm:text-sm font-medium">{targetTenant}</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell className="text-xs sm:text-sm">Phase 2: Boundary Setup</TableCell>
@@ -170,7 +171,7 @@ export default function CompletePage() {
                 <p className="text-xs text-destructive mt-2">Failed to load counts: {summary.error}</p>
               )}
               <p className="text-[11px] text-muted-foreground mt-2">
-                Counts reflect the current total at tenant <code>{state.tenant}</code> — including any data present from earlier setup sessions. To see only what this walk created, browse the Management UI and filter by code prefix.
+                Counts reflect the current total at tenant <code>{targetTenant}</code> — including any data present from earlier setup sessions. To see only what this walk created, browse the Management UI and filter by code prefix.
               </p>
             </div>
           </div>

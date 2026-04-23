@@ -41,6 +41,7 @@ type Step = 'landing' | 'upload' | 'preview' | 'creating-depts' | 'creating-comp
 
 export default function Phase3Page() {
   const { completePhase, addUndo, state } = useApp();
+  const targetTenant = state.targetTenant || state.tenant;
   const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>('landing');
@@ -124,7 +125,7 @@ export default function Phase3Page() {
       if (departments.length > 0) {
         setProgressMessage('Creating departments...');
         const deptResults = await mdmsService.createDepartments(
-          state.tenant,
+          targetTenant,
           departments.map(d => ({
             code: d.code,
             name: d.name,
@@ -136,7 +137,7 @@ export default function Phase3Page() {
 
         // Create localizations for departments
         await localizationService.uploadDepartmentLocalizations(
-          state.tenant,
+          targetTenant,
           departments.map(d => ({ code: d.code, name: d.name })),
           'en_IN'
         );
@@ -148,7 +149,7 @@ export default function Phase3Page() {
       if (designations.length > 0) {
         setProgressMessage('Creating designations...');
         const desigResults = await mdmsService.createDesignations(
-          state.tenant,
+          targetTenant,
           designations.map(d => ({
             code: d.code,
             name: d.name,
@@ -162,7 +163,7 @@ export default function Phase3Page() {
 
         // Create localizations for designations
         await localizationService.uploadDesignationLocalizations(
-          state.tenant,
+          targetTenant,
           designations.map(d => ({ code: d.code, name: d.name })),
           'en_IN'
         );
@@ -180,7 +181,7 @@ export default function Phase3Page() {
       if (complaintTypes.length > 0) {
         setProgressMessage('Creating complaint types...');
         const complaintResults = await mdmsService.createComplaintTypes(
-          state.tenant,
+          targetTenant,
           complaintTypes.map(ct => ({
             serviceCode: ct.serviceCode,
             name: ct.name,
@@ -195,7 +196,7 @@ export default function Phase3Page() {
 
         // Create localizations for complaint types
         await localizationService.uploadComplaintTypeLocalizations(
-          state.tenant,
+          targetTenant,
           complaintTypes.map(ct => ({
             serviceCode: ct.serviceCode,
             name: ct.name,
@@ -615,7 +616,7 @@ export default function Phase3Page() {
           <Banner
             successful={true}
             message="Phase 3 Complete!"
-            info={`Common masters configured for tenant: ${state.tenant.toUpperCase()}`}
+            info={`Common masters configured for tenant: ${targetTenant.toUpperCase()}`}
           />
 
           <div className="mt-6 p-4 bg-muted rounded">

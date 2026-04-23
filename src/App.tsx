@@ -47,7 +47,14 @@ interface AppState {
   isAuthenticated: boolean;
   user: { name: string; email: string; roles: string[]; id?: number; uuid?: string; mobileNumber?: string } | null;
   environment: string;
+  /** Session tenant — the tenant the authenticated user lives under. Stays
+   *  put for the whole walk; used for auth, schema lookups, and any operation
+   *  that has to happen at the state-root tenant. */
   tenant: string;
+  /** Target tenant — the tenant that phases 2–4 write to and read from.
+   *  Set by Phase 1 after a successful tenant create; defaults to the session
+   *  tenant so anything that skips Phase 1 keeps today's behavior. */
+  targetTenant: string;
   mode: AppMode;
   currentPhase: number;
   completedPhases: number[];
@@ -60,6 +67,9 @@ interface AppContextType {
   login: (user: AppState['user'], env: string, tenant: string, mode: AppMode) => void;
   logout: () => void;
   setMode: (mode: AppMode) => void;
+  /** Point subsequent onboarding writes/reads at a child tenant. Called by
+   *  Phase 1 after `tenant.tenants` create succeeds. */
+  setTargetTenant: (code: string) => void;
   completePhase: (phase: number) => void;
   goToPhase: (phase: number) => void;
   addUndo: (action: string, description: string) => void;
@@ -134,7 +144,7 @@ function ManagementAdmin() {
 const AUTH_STORAGE_KEY = 'crs-auth-state';
 
 // Helper to restore apiClient from localStorage
-function restoreApiClientFromStorage(): { isAuthenticated: boolean; user: AppState['user']; environment: string; tenant: string; mode: AppMode; currentPhase: number; completedPhases: number[] } | null {
+function restoreApiClientFromStorage(): { isAuthenticated: boolean; user: AppState['user']; environment: string; tenant: string; targetTenant: string; mode: AppMode; currentPhase: number; completedPhases: number[] } | null {
   const saved = localStorage.getItem(AUTH_STORAGE_KEY);
   if (!saved) return null;
 
@@ -177,6 +187,7 @@ function restoreApiClientFromStorage(): { isAuthenticated: boolean; user: AppSta
         user: parsed.user,
         environment: restoredEnv,
         tenant: restoredTenant,
+        targetTenant: parsed.targetTenant || restoredTenant,
         mode: parsed.mode || 'onboarding',
         currentPhase: parsed.currentPhase || 1,
         completedPhases: parsed.completedPhases || [],
@@ -204,6 +215,7 @@ function App() {
       user: null,
       environment: getApiBaseUrl(),
       tenant: 'ke',
+      targetTenant: 'ke',
       mode: 'onboarding',
       currentPhase: 1,
       completedPhases: [],
@@ -246,6 +258,7 @@ function App() {
         user: state.user,
         environment: state.environment,
         tenant: state.tenant,
+        targetTenant: state.targetTenant,
         mode: state.mode,
         currentPhase: state.currentPhase,
         completedPhases: state.completedPhases,
@@ -253,10 +266,12 @@ function App() {
       };
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authData));
     }
-  }, [state.isAuthenticated, state.user, state.environment, state.tenant, state.mode, state.currentPhase, state.completedPhases]);
+  }, [state.isAuthenticated, state.user, state.environment, state.tenant, state.targetTenant, state.mode, state.currentPhase, state.completedPhases]);
 
   const login = (user: AppState['user'], env: string, tenant: string, mode: AppMode) => {
-    setState(s => ({ ...s, isAuthenticated: true, user, environment: env, tenant, mode }));
+    // Fresh login resets targetTenant to the session tenant. Phase 1 will
+    // point it at a child tenant once a create succeeds.
+    setState(s => ({ ...s, isAuthenticated: true, user, environment: env, tenant, targetTenant: tenant, mode }));
 
     // Configure digitClient with the same auth as apiClient
     const { token } = apiClient.getAuth();
@@ -291,6 +306,11 @@ function App() {
     trackEvent('mode_switch', { mode });
   };
 
+  const setTargetTenant = (code: string) => {
+    setState(s => ({ ...s, targetTenant: code }));
+    trackEvent('target_tenant_set', { targetTenant: code });
+  };
+
   const logout = () => {
     trackEvent('logout', { tenant: state.tenant });
     clearUser();
@@ -301,7 +321,7 @@ function App() {
     apiClient.logout();
     digitClient.clearAuth();
     resetProviders();
-    setState(s => ({ ...s, isAuthenticated: false, user: null, mode: 'onboarding', currentPhase: 1, completedPhases: [] }));
+    setState(s => ({ ...s, isAuthenticated: false, user: null, mode: 'onboarding', currentPhase: 1, completedPhases: [], targetTenant: s.tenant }));
   };
 
   const completePhase = (phase: number) => {
@@ -383,6 +403,7 @@ function App() {
     login,
     logout,
     setMode,
+    setTargetTenant,
     completePhase,
     goToPhase,
     addUndo,
