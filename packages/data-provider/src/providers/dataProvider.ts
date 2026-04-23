@@ -307,6 +307,64 @@ export function createDigitDataProvider(client: DigitApiClient, tenantId: string
     async getList(resource, params): Promise<GetListResult> {
       const { page = 1, perPage = 25 } = params.pagination ?? {};
       const { field = 'id', order = 'ASC' } = params.sort ?? {};
+
+      // PGR complaints: push pagination + server-supported filters to the
+      // API. The old behavior pulled the first 100 records and paginated
+      // client-side, which silently truncated larger tenants. `_count`
+      // returns the real total so react-admin's paginator stays honest.
+      const config = resolveConfig(resource);
+      if (config.type === 'pgr') {
+        const filter = (params.filter ?? {}) as Record<string, unknown>;
+        const status = filter.applicationStatus ?? filter.status;
+        const fromDate = typeof filter.fromDate === 'number' ? filter.fromDate : undefined;
+        const toDate = typeof filter.toDate === 'number' ? filter.toDate : undefined;
+        const department =
+          typeof filter['additionalDetail.department'] === 'string'
+            ? filter['additionalDetail.department']
+            : typeof filter.department === 'string'
+            ? filter.department
+            : undefined;
+        const q = typeof filter.q === 'string' ? filter.q.trim() : undefined;
+
+        const searchOpts = {
+          status: typeof status === 'string' ? status : undefined,
+          fromDate,
+          toDate,
+          sortBy: field,
+          sortOrder: order,
+          limit: perPage,
+          offset: (page - 1) * perPage,
+        };
+        const [wrappers, total] = await Promise.all([
+          client.pgrSearch(tenantId, searchOpts),
+          client.pgrCount(tenantId, { status: searchOpts.status, fromDate, toDate }),
+        ]);
+        let records = wrappers.map((w) => {
+          const service = (w.service || w) as Record<string, unknown>;
+          return normalizeRecord(service, config);
+        });
+        // Client-side filters for fields the server's criteria don't cover.
+        if (department) {
+          records = records.filter((r) => {
+            const d = (r as Record<string, unknown>).additionalDetail as
+              | Record<string, unknown>
+              | undefined;
+            return d?.department === department;
+          });
+        }
+        if (q) {
+          const needle = q.toLowerCase();
+          records = records.filter((r) => {
+            const rec = r as Record<string, unknown>;
+            return (
+              String(rec.serviceRequestId ?? '').toLowerCase().includes(needle) ||
+              String(rec.description ?? '').toLowerCase().includes(needle)
+            );
+          });
+        }
+        return { data: records, total };
+      }
+
       const all = await fetchAll(resource, params.filter);
       const filtered = clientFilter(all, params.filter);
       const sorted = clientSort(filtered, field, order);

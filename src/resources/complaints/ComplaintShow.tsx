@@ -2,7 +2,7 @@ import { DigitShow } from '@/admin';
 import { FieldSection, FieldRow, DateField, StatusChip } from '@/admin/fields';
 import { EntityLink } from '@/components/ui/EntityLink';
 import { useShowController, useGetManyReference } from 'ra-core';
-import { Star } from 'lucide-react';
+import { Star, ExternalLink } from 'lucide-react';
 
 function WorkflowTimeline({ serviceRequestId }: { serviceRequestId: string }) {
   const { data, isPending } = useGetManyReference(
@@ -14,10 +14,10 @@ function WorkflowTimeline({ serviceRequestId }: { serviceRequestId: string }) {
       sort: { field: 'auditDetails.createdTime', order: 'ASC' },
       filter: {},
     },
-    { enabled: !!serviceRequestId }
+    { enabled: !!serviceRequestId },
   );
 
-  if (isPending) return <div className="text-sm text-muted-foreground animate-pulse">Loading timeline...</div>;
+  if (isPending) return <div className="text-sm text-muted-foreground animate-pulse">Loading timeline…</div>;
   if (!data || data.length === 0) return <div className="text-sm text-muted-foreground">No workflow history</div>;
 
   return (
@@ -25,6 +25,7 @@ function WorkflowTimeline({ serviceRequestId }: { serviceRequestId: string }) {
       {data.map((process, i) => {
         const p = process as Record<string, unknown>;
         const audit = p.auditDetails as Record<string, unknown> | undefined;
+        const state = typeof p.state === 'object' ? (p.state as Record<string, unknown>)?.state : p.state;
         return (
           <div key={i} className="flex gap-3 items-start">
             <div className="flex flex-col items-center">
@@ -34,9 +35,11 @@ function WorkflowTimeline({ serviceRequestId }: { serviceRequestId: string }) {
             <div className="pb-4 flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">{String(p.action ?? '--')}</span>
-                <StatusChip value={p.state} />
+                <StatusChip value={state} />
               </div>
-              {p.comment != null && <p className="text-sm text-muted-foreground mt-1">{String(p.comment)}</p>}
+              {p.comment != null && (
+                <p className="text-sm text-muted-foreground mt-1">{String(p.comment)}</p>
+              )}
               <div className="text-xs text-muted-foreground mt-1">
                 <DateField value={audit?.createdTime} />
               </div>
@@ -63,6 +66,25 @@ function RatingStars({ rating }: { rating: unknown }) {
   );
 }
 
+function GeoLocationLink({ lat, lng }: { lat: unknown; lng: unknown }) {
+  const latN = Number(lat);
+  const lngN = Number(lng);
+  if (!Number.isFinite(latN) || !Number.isFinite(lngN) || (latN === 0 && lngN === 0)) {
+    return <span className="text-muted-foreground">--</span>;
+  }
+  return (
+    <a
+      href={`https://www.google.com/maps?q=${latN},${lngN}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 text-primary hover:underline"
+    >
+      {latN.toFixed(6)}, {lngN.toFixed(6)}
+      <ExternalLink className="w-3 h-3" />
+    </a>
+  );
+}
+
 export function ComplaintShow() {
   const { record } = useShowController();
 
@@ -72,19 +94,36 @@ export function ComplaintShow() {
         const citizen = rec.citizen as Record<string, unknown> | undefined;
         const address = rec.address as Record<string, unknown> | undefined;
         const locality = address?.locality as Record<string, unknown> | undefined;
+        const geo = address?.geoLocation as Record<string, unknown> | undefined;
         const audit = rec.auditDetails as Record<string, unknown> | undefined;
+        const additional = rec.additionalDetail as Record<string, unknown> | undefined;
 
         return (
           <div className="space-y-6">
             <FieldSection title="Header">
               <FieldRow label="Request ID">{String(rec.serviceRequestId ?? '')}</FieldRow>
-              <FieldRow label="Status"><StatusChip value={rec.applicationStatus} /></FieldRow>
-              <FieldRow label="Rating"><RatingStars rating={rec.rating} /></FieldRow>
+              <FieldRow label="Status">
+                <StatusChip value={rec.applicationStatus} />
+              </FieldRow>
+              <FieldRow label="Rating">
+                <RatingStars rating={rec.rating} />
+              </FieldRow>
             </FieldSection>
 
             <FieldSection title="Details">
               <FieldRow label="Type">
-                {rec.serviceCode ? <EntityLink resource="complaint-types" id={String(rec.serviceCode)} /> : '--'}
+                {rec.serviceCode ? (
+                  <EntityLink resource="complaint-types" id={String(rec.serviceCode)} />
+                ) : (
+                  '--'
+                )}
+              </FieldRow>
+              <FieldRow label="Department">
+                {additional?.department ? (
+                  <EntityLink resource="departments" id={String(additional.department)} />
+                ) : (
+                  <span className="text-muted-foreground">--</span>
+                )}
               </FieldRow>
               <FieldRow label="Description">{String(rec.description ?? '')}</FieldRow>
               <FieldRow label="Source">{String(rec.source ?? '--')}</FieldRow>
@@ -97,20 +136,31 @@ export function ComplaintShow() {
 
             <FieldSection title="Address">
               <FieldRow label="Locality">
-                {locality?.code ? <EntityLink resource="boundaries" id={String(locality.code)} /> : '--'}
+                {locality?.code ? (
+                  <EntityLink resource="boundaries" id={String(locality.code)} />
+                ) : (
+                  '--'
+                )}
               </FieldRow>
-              <FieldRow label="City">{String(address?.city ?? '--')}</FieldRow>
+              <FieldRow label="Landmark">{String(address?.landmark ?? '--')}</FieldRow>
+              <FieldRow label="Street">{String(address?.street ?? '--')}</FieldRow>
+              <FieldRow label="Pincode">{String(address?.pincode ?? '--')}</FieldRow>
+              <FieldRow label="Geo">
+                <GeoLocationLink lat={geo?.latitude} lng={geo?.longitude} />
+              </FieldRow>
             </FieldSection>
 
             <FieldSection title="Workflow Timeline">
-              <WorkflowTimeline
-                serviceRequestId={String(rec.serviceRequestId ?? '')}
-              />
+              <WorkflowTimeline serviceRequestId={String(rec.serviceRequestId ?? '')} />
             </FieldSection>
 
             <FieldSection title="Audit">
-              <FieldRow label="Created"><DateField value={audit?.createdTime} /></FieldRow>
-              <FieldRow label="Last Modified"><DateField value={audit?.lastModifiedTime} /></FieldRow>
+              <FieldRow label="Created">
+                <DateField value={audit?.createdTime} />
+              </FieldRow>
+              <FieldRow label="Last Modified">
+                <DateField value={audit?.lastModifiedTime} />
+              </FieldRow>
             </FieldSection>
           </div>
         );
