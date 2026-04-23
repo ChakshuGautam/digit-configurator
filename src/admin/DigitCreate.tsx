@@ -1,15 +1,34 @@
 import React from 'react';
-import { CreateBase, useCreateContext, Form, type TransformData } from 'ra-core';
+import { CreateBase, useCreateContext, Form, useResourceContext, type TransformData, type RaRecord } from 'ra-core';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
 import { DigitCard } from '@/components/digit/DigitCard';
 import { ActionBar } from '@/components/digit/ActionBar';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/hooks/use-toast';
 import {
   useMutationError,
   MutationErrorBanner,
   type MutationErrorInfo,
 } from './mutationError';
+
+/** Pull a human-facing label off a just-created record for the toast copy. */
+function pickRecordLabel(data: RaRecord | undefined): string {
+  if (!data) return 'Record';
+  const rec = data as unknown as Record<string, unknown>;
+  for (const key of ['name', 'code', 'userName', 'id']) {
+    const v = rec[key];
+    if (typeof v === 'string' && v.trim()) return v;
+  }
+  return 'Record';
+}
+
+/** Prettify a resource name for toast copy: 'boundary-hierarchies' → 'Boundary hierarchy'. */
+function prettyResourceSingular(resource: string | undefined): string {
+  if (!resource) return 'Record';
+  const head = resource.replace(/-/g, ' ').replace(/s$/, '');
+  return head.charAt(0).toUpperCase() + head.slice(1);
+}
 
 export interface DigitCreateProps {
   /** Page title */
@@ -98,6 +117,8 @@ function DigitCreateContent({
 
 export function DigitCreate({ title, children, resource, record, redirect = 'list', transform }: DigitCreateProps) {
   const { info, capture, clear } = useMutationError();
+  const contextResource = useResourceContext();
+  const effectiveResource = resource ?? contextResource;
   return (
     <CreateBase
       resource={resource}
@@ -106,7 +127,17 @@ export function DigitCreate({ title, children, resource, record, redirect = 'lis
       transform={transform}
       mutationOptions={{
         onError: (err) => capture(err),
-        onSuccess: () => clear(),
+        onSuccess: (data) => {
+          clear();
+          // Without a toast the page silently redirects to list — operators
+          // have no way to tell a 200 apart from a quietly-swallowed 500
+          // (closes egovernments/CCRS#436 second half).
+          const label = pickRecordLabel(data);
+          toast({
+            title: `${prettyResourceSingular(effectiveResource)} created`,
+            description: label !== 'Record' ? label : undefined,
+          });
+        },
       }}
     >
       <DigitCreateContent title={title} errorInfo={info} onDismissError={clear}>

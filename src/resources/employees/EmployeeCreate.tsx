@@ -93,6 +93,19 @@ export function EmployeeCreate() {
 
   return (
     <DigitCreate title="Create Employee" record={defaults} transform={transform}>
+      <FieldSection title="Tenant">
+        <DigitFormSelect
+          source="tenantId"
+          label="Tenant"
+          reference="tenants"
+          optionValue="code"
+          optionText="code"
+          validate={v.codeRequired}
+          placeholder="Select tenant"
+          help="Employee is created on this tenant — must match the login subdomain (e.g. ke.nairobi)."
+        />
+      </FieldSection>
+
       <FieldSection title="Employee Info">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <DigitFormInput source="user.name" label="Name" validate={v.name} />

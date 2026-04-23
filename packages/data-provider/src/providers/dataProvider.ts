@@ -508,7 +508,16 @@ export function createDigitDataProvider(client: DigitApiClient, tenantId: string
         return { data: normalizeMdmsRecord(record, config) };
       }
       if (config.type === 'hrms') {
-        const [employee] = await client.employeeCreate(tenantId, [params.data as Record<string, unknown>]);
+        const data = params.data as Record<string, unknown>;
+        // Prefer the form-selected tenantId over the session tenant so a
+        // root-`ke` admin can create an employee directly at `ke.nairobi`
+        // (closes egovernments/CCRS#416). Falls back to the session tenant
+        // when the form omits it — non-root logins keep today's behavior.
+        const targetTenantId =
+          typeof data.tenantId === 'string' && data.tenantId.trim()
+            ? data.tenantId.trim()
+            : tenantId;
+        const [employee] = await client.employeeCreate(targetTenantId, [data]);
         return { data: normalizeRecord(employee, config) };
       }
       if (config.type === 'pgr') {
@@ -623,13 +632,21 @@ export function createDigitDataProvider(client: DigitApiClient, tenantId: string
         const uuid = typeof data.uuid === 'string' && data.uuid
           ? data.uuid
           : String(params.id);
-        const fetched = await client.employeeSearch(tenantId, { uuids: [uuid] });
+        // Prefer the record's tenantId over the session tenant — lets a
+        // root-`ke` admin edit an employee that actually lives at
+        // `ke.nairobi` (closes egovernments/CCRS#416). Falls back to the
+        // session tenant when the record omits it.
+        const targetTenantId =
+          typeof data.tenantId === 'string' && data.tenantId.trim()
+            ? data.tenantId.trim()
+            : tenantId;
+        const fetched = await client.employeeSearch(targetTenantId, { uuids: [uuid] });
         if (!fetched.length) throw new Error(`Employee not found: ${uuid}`);
         const base = fetched[0] as Record<string, unknown>;
         const { id: _stringId, ...rest } = data;
         void _stringId;
         const merged: Record<string, unknown> = { ...base, ...rest };
-        const [employee] = await client.employeeUpdate(tenantId, [merged]);
+        const [employee] = await client.employeeUpdate(targetTenantId, [merged]);
         return { data: normalizeRecord(employee, config) };
       }
       if (config.type === 'pgr') {
@@ -714,19 +731,29 @@ export function createDigitDataProvider(client: DigitApiClient, tenantId: string
         return { data: normalizeMdmsRecord(existing, config) };
       }
       if (config.type === 'hrms') {
+        // Prefer the record's tenantId over the session tenant so a
+        // root-`ke` admin can deactivate an employee that lives at
+        // `ke.nairobi` (closes egovernments/CCRS#416). Pulled off
+        // previousData because react-admin's delete payload is just
+        // the id; falls back to the session tenant otherwise.
+        const prev = (params as { previousData?: Record<string, unknown> }).previousData ?? {};
+        const targetTenantId =
+          typeof prev.tenantId === 'string' && prev.tenantId.trim()
+            ? prev.tenantId.trim()
+            : tenantId;
         // Search by UUID first (idField is 'uuid'), fall back to codes
-        let results = await client.employeeSearch(tenantId, { uuids: [String(params.id)] });
-        if (!results.length) results = await client.employeeSearch(tenantId, { codes: [String(params.id)] });
+        let results = await client.employeeSearch(targetTenantId, { uuids: [String(params.id)] });
+        if (!results.length) results = await client.employeeSearch(targetTenantId, { codes: [String(params.id)] });
         if (!results.length) throw new Error(`Employee not found: ${params.id}`);
         let emp = results[0] as Record<string, unknown>;
         // If user is null (UUID search may omit user), re-fetch by code to get full object
         if (!emp.user && emp.code) {
-          const byCode = await client.employeeSearch(tenantId, { codes: [emp.code as string] });
+          const byCode = await client.employeeSearch(targetTenantId, { codes: [emp.code as string] });
           if (byCode.length) emp = byCode[0] as Record<string, unknown>;
         }
         emp.isActive = false;
         emp.deactivationDetails = [{ reasonForDeactivation: 'OTHERS', effectiveFrom: Date.now() }];
-        const [updated] = await client.employeeUpdate(tenantId, [emp]);
+        const [updated] = await client.employeeUpdate(targetTenantId, [emp]);
         return { data: normalizeRecord(updated, config) };
       }
       if (config.type === 'pgr') {
