@@ -63,7 +63,9 @@ export function ComplaintEdit() {
             reference="boundaries"
             placeholder="Select locality..."
           />
-          <DigitFormInput source="address.city" label="City" />
+          <DigitFormInput source="address.landmark" label="Landmark" />
+          <DigitFormInput source="address.pincode" label="Pincode" />
+          <DigitFormInput source="address.street" label="Street" />
         </div>
       </FieldSection>
     </DigitEdit>

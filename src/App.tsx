@@ -154,9 +154,13 @@ function restoreApiClientFromStorage(): { isAuthenticated: boolean; user: AppSta
       });
       apiClient.setTenantId(parsed.tenant);
 
-      // Also configure the shared digitClient from the bridge
+      // Also configure the shared digitClient from the bridge. If the stored
+      // session lacks a tenant, bail — there's no sensible default (a stale
+      // `'statea'` or `'pg'` fallback silently attached operators to the wrong
+      // tenant and hid the real "re-login" needed).
       const restoredEnv = parsed.environment || getApiBaseUrl();
-      const restoredTenant = parsed.tenant || 'statea';
+      const restoredTenant = parsed.tenant;
+      if (!restoredTenant) return null;
       configureDigitClient(restoredEnv, parsed.authToken, {
         id: parsed.user.id ?? 0,
         uuid: parsed.user.uuid ?? '',

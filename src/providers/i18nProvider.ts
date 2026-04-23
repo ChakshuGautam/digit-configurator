@@ -475,7 +475,12 @@ async function fetchAppTranslations(locale: string): Promise<Record<string, stri
   if (cached) return cached;
 
   try {
-    const tenantId = digitClient.stateTenantId || 'pg';
+    const tenantId = digitClient.stateTenantId;
+    // No session tenant yet → no translations to fetch. Returning empty lets
+    // the UI fall through to the bundled English strings instead of pointing
+    // the localization call at a hardcoded `'pg'` that doesn't exist on every
+    // deployment.
+    if (!tenantId) return {};
     const messages = await digitClient.localizationSearch(tenantId, locale, 'configurator-ui');
     const flat: Record<string, string> = {};
     for (const msg of messages) {
