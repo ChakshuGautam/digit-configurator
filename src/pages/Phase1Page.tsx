@@ -69,7 +69,7 @@ const BRANDING_FIELDS: ReadonlyArray<{
 ];
 
 export default function Phase1Page() {
-  const { completePhase, addUndo, state } = useApp();
+  const { completePhase, addUndo, state, setTargetTenant } = useApp();
   const navigate = useNavigate();
   const rootTenant = state.tenant;
   const [step, setStep] = useState<Step>('landing');
@@ -149,6 +149,9 @@ export default function Phase1Page() {
       );
 
       setCreatedTenant(tenant);
+      // Retarget subsequent phases at the freshly-created child tenant so
+      // Phases 2–4 write to (and read from) it instead of the session root.
+      setTargetTenant(tenant.code);
       addUndo('create_tenant', `Created tenant: ${tenant.code}`);
       setStep('branding');
     } catch (err) {
