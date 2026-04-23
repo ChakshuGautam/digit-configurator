@@ -16,9 +16,9 @@ export default function LoginPage() {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    username: 'ADMIN',
-    password: 'eGov@123',
-    tenantCode: 'ke',
+    username: '',
+    password: '',
+    tenantCode: '',
   });
   const [mode, setMode] = useState<AppMode>('onboarding');
   const [showPassword, setShowPassword] = useState(false);
@@ -106,7 +106,7 @@ export default function LoginPage() {
           <DigitCardHeader>Sign In</DigitCardHeader>
           <DigitCardSubHeader>Enter your credentials to continue</DigitCardSubHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-6 mt-6">
+          <form onSubmit={handleSubmit} className="space-y-6 mt-6" autoComplete="off">
             {/* Mode Toggle */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Mode</label>
@@ -164,6 +164,7 @@ export default function LoginPage() {
                   onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                   placeholder="Enter username"
                   className="border-input-border focus:border-primary focus:ring-primary"
+                  autoComplete="off"
                   required
                 />
               </Field>
@@ -181,6 +182,7 @@ export default function LoginPage() {
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     className="pr-10 border-input-border focus:border-primary focus:ring-primary"
                     placeholder="Enter password"
+                    autoComplete="new-password"
                     required
                   />
                   <button
@@ -215,6 +217,7 @@ export default function LoginPage() {
                   onChange={(e) => setFormData({ ...formData, tenantCode: e.target.value })}
                   placeholder="ke"
                   className="border-input-border focus:border-primary focus:ring-primary"
+                  autoComplete="off"
                   required
                 />
                 <p className="text-xs text-muted-foreground mt-1">Root tenant for authentication</p>

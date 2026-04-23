@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../App';
 import {
@@ -19,6 +19,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DigitCard, DigitCardText } from '@/components/digit/DigitCard';
 import { Header, SubHeader } from '@/components/digit/Header';
 import { SubmitBar } from '@/components/digit/SubmitBar';
@@ -83,6 +84,21 @@ export default function Phase1Page() {
   // Per-row error so a bad upload surfaces inline next to the failed row,
   // not at the top of the page where users miss it.
   const [brandingErrors, setBrandingErrors] = useState<Partial<Record<keyof BrandingData, string>>>({});
+  // Object URLs of the uploaded branding files, kept local so the Preview
+  // button works without a filestore round-trip. Revoked when a row is
+  // replaced or the page unmounts.
+  const [brandingPreviews, setBrandingPreviews] = useState<Partial<Record<keyof BrandingData, string>>>({});
+  const brandingPreviewsRef = useRef(brandingPreviews);
+  brandingPreviewsRef.current = brandingPreviews;
+  const [previewingKey, setPreviewingKey] = useState<keyof BrandingData | null>(null);
+
+  useEffect(() => {
+    return () => {
+      Object.values(brandingPreviewsRef.current).forEach((url) => {
+        if (url) URL.revokeObjectURL(url);
+      });
+    };
+  }, []);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
 
   // Created tenant
@@ -218,6 +234,10 @@ export default function Phase1Page() {
     try {
       const result = await apiClient.uploadFile(file, 'branding');
       setBrandingData(prev => ({ ...prev, [type]: result.fileStoreId }));
+      setBrandingPreviews(prev => {
+        if (prev[type]) URL.revokeObjectURL(prev[type]!);
+        return { ...prev, [type]: URL.createObjectURL(file) };
+      });
     } catch (err) {
       console.error('File upload error:', err);
       const msg = err instanceof Error ? err.message : 'Upload failed';
@@ -617,8 +637,13 @@ export default function Phase1Page() {
                     )}
                   </div>
                   <div className="flex gap-2 flex-shrink-0">
-                    {uploaded && (
-                      <Button variant="outline" size="sm" className="hidden sm:flex border-primary text-primary hover:bg-primary/10">
+                    {uploaded && brandingPreviews[key] && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="hidden sm:flex border-primary text-primary hover:bg-primary/10"
+                        onClick={() => setPreviewingKey(key)}
+                      >
                         <Eye className="w-4 h-4 mr-1" />
                         Preview
                       </Button>
@@ -700,6 +725,26 @@ export default function Phase1Page() {
           </div>
         </DigitCard>
       )}
+
+      {/* Branding preview modal */}
+      <Dialog open={previewingKey !== null} onOpenChange={(open) => !open && setPreviewingKey(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {previewingKey && BRANDING_FIELDS.find((f) => f.key === previewingKey)?.label}
+            </DialogTitle>
+          </DialogHeader>
+          {previewingKey && brandingPreviews[previewingKey] && (
+            <div className="flex items-center justify-center bg-muted/30 rounded p-4">
+              <img
+                src={brandingPreviews[previewingKey]}
+                alt={BRANDING_FIELDS.find((f) => f.key === previewingKey)?.label}
+                className="max-h-[70vh] max-w-full object-contain"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
