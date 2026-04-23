@@ -567,6 +567,10 @@ export function createDigitDataProvider(client: DigitApiClient, tenantId: string
         const data = params.data as Record<string, unknown>;
         const hierarchyType = String(data.hierarchyType ?? '').trim();
         if (!hierarchyType) throw new Error('hierarchyType is required');
+        const targetTenantId =
+          typeof data.tenantId === 'string' && data.tenantId.trim()
+            ? data.tenantId.trim()
+            : tenantId;
         const levelsInput = Array.isArray(data.boundaryHierarchy) ? data.boundaryHierarchy : [];
         const levels = levelsInput
           .map((lvl) => lvl as Record<string, unknown>)
@@ -580,7 +584,7 @@ export function createDigitDataProvider(client: DigitApiClient, tenantId: string
           }));
         if (levels.length === 0) throw new Error('At least one hierarchy level is required');
         const created = await client.boundaryHierarchyCreate(
-          tenantId,
+          targetTenantId,
           hierarchyType,
           levels,
         );
