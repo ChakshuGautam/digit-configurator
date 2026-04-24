@@ -65,6 +65,18 @@ export function EmployeeCreate() {
   };
 
   const transform = (data: Record<string, unknown>): Record<string, unknown> => {
+    // Prefer the form-picked tenantId over the session tenant. The outer
+    // closure `tenantId` is the session tenant (e.g. root `ke` for ADMIN);
+    // letting it shadow `data.tenantId` here was the reason every Create
+    // landed in the session tenant no matter which tenant the operator
+    // picked in the form. The dataProvider already reads `data.tenantId`
+    // correctly (PR #31) — this transform was silently clobbering the
+    // form value before it ever reached the provider.
+    const targetTenantId =
+      typeof data.tenantId === 'string' && data.tenantId.trim()
+        ? data.tenantId.trim()
+        : tenantId;
+
     const userInput = (data.user as Record<string, unknown> | undefined) ?? {};
     const name = typeof userInput.name === 'string' ? userInput.name.trim() : '';
     const userName =
@@ -74,7 +86,7 @@ export function EmployeeCreate() {
     const user = {
       ...userInput,
       userName,
-      tenantId,
+      tenantId: targetTenantId,
       type: 'EMPLOYEE',
       active: true,
       password: typeof userInput.password === 'string' && userInput.password ? userInput.password : DEFAULT_PASSWORD,
@@ -85,7 +97,7 @@ export function EmployeeCreate() {
 
     return {
       ...data,
-      tenantId,
+      tenantId: targetTenantId,
       dateOfAppointment: doa,
       user,
     };
