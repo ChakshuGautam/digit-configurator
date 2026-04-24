@@ -191,9 +191,36 @@ async function pgrGetList(client: DigitApiClient, config: ResourceConfig, tenant
 }
 
 async function localizationGetList(client: DigitApiClient, config: ResourceConfig, tenantId: string, filter?: Record<string, unknown>): Promise<RaRecord[]> {
+  // Side-by-side pivot of two locales. The list view picks the locales via
+  // dropdowns and passes them as `locale` (left column) and `locale2` (right
+  // column). Defaults preserve the previous en_IN-only behavior on the left
+  // and surface sw_KE on the right so Nairobi pilot translators see both
+  // out of the box.
   const module = filter?.module ? String(filter.module) : undefined;
-  const messages = await client.localizationSearch(tenantId, 'en_IN', module);
-  return messages.map((m) => normalizeRecord(m, config));
+  const localeA = filter?.locale ? String(filter.locale) : 'en_IN';
+  const localeB = filter?.locale2 ? String(filter.locale2) : 'sw_KE';
+  const [aMsgs, bMsgs] = await Promise.all([
+    client.localizationSearch(tenantId, localeA, module),
+    localeA === localeB ? Promise.resolve([] as Record<string, unknown>[]) : client.localizationSearch(tenantId, localeB, module),
+  ]);
+  // Pivot keyed by `${code}__${module}` so a code that appears under
+  // multiple modules doesn't get collapsed (real DIGIT data does this).
+  const pivot = new Map<string, Record<string, unknown>>();
+  const upsert = (m: Record<string, unknown>, side: 'A' | 'B') => {
+    const code = String(m.code ?? '');
+    const mod = String(m.module ?? '');
+    const key = `${code}__${mod}`;
+    let row = pivot.get(key);
+    if (!row) {
+      row = { id: key, code, module: mod, message: '', message2: '', locale: localeA, locale2: localeB };
+      pivot.set(key, row);
+    }
+    if (side === 'A') row.message = String(m.message ?? '');
+    else row.message2 = String(m.message ?? '');
+  };
+  for (const m of aMsgs) upsert(m as Record<string, unknown>, 'A');
+  for (const m of bMsgs) upsert(m as Record<string, unknown>, 'B');
+  return Array.from(pivot.values()).map((r) => normalizeRecord(r, config));
 }
 
 async function userGetList(client: DigitApiClient, config: ResourceConfig, tenantId: string, filter?: Record<string, unknown>): Promise<RaRecord[]> {
@@ -689,12 +716,37 @@ export function createDigitDataProvider(client: DigitApiClient, tenantId: string
         return { data: normalizeRecord(updatedService, config) };
       }
       if (config.type === 'localization') {
+        // Inline-edit on the pivoted list emits a single row with both
+        // `message` (locale A) and `message2` (locale B). Diff against
+        // previousData to know which side actually changed and upsert only
+        // that locale — saves a round-trip and avoids accidentally clobbering
+        // the other side with a stale value.
         const data = params.data as Record<string, unknown>;
-        const messages = await client.localizationUpsert(tenantId, String(data.locale || 'en_IN'), [
-          { code: String(data.code || params.id), message: String(data.message), module: String(data.module) },
-        ]);
-        if (messages.length) return { data: normalizeRecord(messages[0], config) };
-        return { data: { ...data, id: String(data.code || params.id) } as RaRecord };
+        const prev = (params.previousData ?? {}) as Record<string, unknown>;
+        const code = String(data.code || params.id);
+        const mod = String(data.module ?? '');
+        const localeA = String(data.locale ?? 'en_IN');
+        const localeB = String(data.locale2 ?? 'sw_KE');
+        const writes: Promise<unknown>[] = [];
+        if (data.message !== undefined && data.message !== prev.message) {
+          writes.push(client.localizationUpsert(tenantId, localeA, [
+            { code, message: String(data.message ?? ''), module: mod },
+          ]));
+        }
+        if (data.message2 !== undefined && data.message2 !== prev.message2) {
+          writes.push(client.localizationUpsert(tenantId, localeB, [
+            { code, message: String(data.message2 ?? ''), module: mod },
+          ]));
+        }
+        // Legacy non-pivot callers (Show/Edit individual record pages) only
+        // send `message` + `locale` — the first branch handles them.
+        if (writes.length === 0 && data.message !== undefined) {
+          writes.push(client.localizationUpsert(tenantId, localeA, [
+            { code, message: String(data.message), module: mod },
+          ]));
+        }
+        await Promise.all(writes);
+        return { data: { ...data, id: String(data.id ?? `${code}__${mod}`) } as RaRecord };
       }
       if (config.type === 'boundary') {
         const data = params.data as Record<string, unknown>;
