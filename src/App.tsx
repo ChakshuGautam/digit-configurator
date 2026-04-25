@@ -33,7 +33,15 @@ import PgrDashboard from './pages/PgrDashboard';
 import { getGenericMdmsResources, getDataProvider, getAuthProvider, configureDigitClient, digitClient, resetProviders, i18nProvider } from '@/providers/bridge';
 import { ThemeProvider } from '@/providers/ThemeProvider';
 import HelpModal from './components/ui/HelpModal';
-import UndoToast from './components/ui/UndoToast';
+// UndoToast removed — see CCRS#417. The previous Undo button only popped
+// the local UI stack; egov-mdms-service exposes no `_delete`/`_disable`
+// endpoint, so there is no real way to roll back a created tenant +
+// branding + localization rows from this UI today. The button promised
+// rollback it couldn't deliver, so we hide it until the backend grows
+// proper compensators (or until product defines a different semantic for
+// "Undo" — e.g. soft-deactivate via `_update isActive=false` for schemas
+// without unique-key collisions).
+// import UndoToast from './components/ui/UndoToast';
 import { Toaster } from './components/ui/toaster';
 import { apiClient, getApiBaseUrl } from './api';
 import { identifyUser, clearUser, trackEvent } from './lib/telemetry';
@@ -445,7 +453,7 @@ function App() {
 
         {/* Global modals and toasts */}
         {state.showHelp && <HelpModal onClose={toggleHelp} />}
-        <UndoToast items={state.undoStack} onUndo={undo} onDismiss={dismissUndo} />
+        {/* <UndoToast items={state.undoStack} onUndo={undo} onDismiss={dismissUndo} /> */}
         <Toaster />
       </BrowserRouter>
       </ThemeProvider>
