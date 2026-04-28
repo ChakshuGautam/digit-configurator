@@ -18,6 +18,44 @@ function flatten(obj: unknown, prefix = ''): Record<string, string> {
   return out;
 }
 
+/**
+ * Mirror of the runtime SEMANTIC_EXPANSION (theflywheel/digit-ui-esbuild
+ * src/theme/applyTheme.js): each v2 input back-fills the legacy v1 paths the
+ * preview already targets. The preview was built against v1 paths; rather
+ * than rewrite every `data-token` attribute, we project v2 → v1 here so a
+ * Brand/Brand-on/Surface-header/etc. value flows into all the v1 paths the
+ * preview already reads.
+ */
+const V2_TO_V1_FALLBACK: Record<string, string[]> = {
+  brand: ['primary.main'],
+  'brand-on': ['primary.dark', 'primary.accent', 'link.normal', 'link.hover', 'text.heading'],
+  'surface-header': ['secondary', 'digitv2.header-sidenav'],
+  'surface-page': ['grey.light'],
+  'text-primary': ['text.primary'],
+  'text-secondary': ['text.secondary', 'text.muted'],
+  'text-disabled': ['grey.disabled', 'digitv2.text-color-disabled'],
+  border: ['border', 'input-border'],
+  error: ['error', 'error-dark'],
+  success: ['success'],
+  info: ['digitv2.alert-info', 'info-dark'],
+  warning: ['warning-dark'],
+  'selected-bg': ['primary.selected-bg', 'digitv2.primary-bg'],
+};
+
+/** Apply v2 → v1 fan-out so the preview reads consistent values whether the
+ *  admin is entering v1 (legacy) or v2 (semantic) keys. v2 wins on overlap.
+ *  Mirrors applyTheme.js's two-pass behavior. */
+function expandV2(flat: Record<string, string>): Record<string, string> {
+  const out = { ...flat };
+  for (const [v2Key, v1Paths] of Object.entries(V2_TO_V1_FALLBACK)) {
+    const value = flat[v2Key];
+    if (typeof value === 'string' && value) {
+      for (const v1Path of v1Paths) out[v1Path] = value;
+    }
+  }
+  return out;
+}
+
 /** Token helper: read `colors.<path>` with a safe default for empty cells. */
 function tk(flat: Record<string, string>, path: string, fallback: string): string {
   return flat[path] || fallback;
@@ -39,7 +77,10 @@ export function ThemePreview() {
   const colors = useWatch({ name: 'colors' });
   const hover = useHoverContext();
 
-  const flat = useMemo(() => flatten(colors), [colors]);
+  // First flatten the form record, then fan v2 semantic keys into the v1
+  // paths the preview was originally built against. Either entry shape now
+  // drives the preview consistently.
+  const flat = useMemo(() => expandV2(flatten(colors)), [colors]);
 
   // Chart bars — heights are hard-coded; colors come from chart-1..5.
   const chart = [
