@@ -437,7 +437,13 @@ export function parseDepartmentExcel(workbook: XLSX.WorkBook): {
   jsonData.forEach((row, index) => {
     const code = String(row['code'] || row['Code'] || row['departmentCode'] || '').trim();
     const name = String(row['name'] || row['Name'] || row['departmentName'] || '').trim();
-    const activeStr = String(row['active'] || row['Active'] || row['isActive'] || 'true').trim().toLowerCase();
+    // Use ?? not || — when LibreOffice / Google Sheets renders a `FALSE`
+    // cell as the JS boolean `false`, `||` treats it as falsy and falls
+    // through to the default `'true'`, flipping every deactivated row to
+    // active. ?? only short-circuits on null/undefined (closes
+    // egovernments/CCRS#472 — bulk-import boolean parsing).
+    const rawActive = row['active'] ?? row['Active'] ?? row['isActive'] ?? 'true';
+    const activeStr = String(rawActive).trim().toLowerCase();
     const active = activeStr === 'true' || activeStr === 'yes' || activeStr === '1';
 
     if (!code) {
@@ -512,7 +518,9 @@ export function parseDesignationExcel(workbook: XLSX.WorkBook): {
     const description = String(row['description'] || row['Description'] || '').trim() || name;
     const deptRaw = String(row['department'] || row['Department'] || '').trim();
     const department = deptRaw ? deptRaw.split(',').map(s => s.trim()).filter(Boolean) : undefined;
-    const activeStr = String(row['active'] || row['Active'] || row['isActive'] || 'true').trim().toLowerCase();
+    // Use ?? — see Department parser note for the FALSE-coalescing bug.
+    const rawActive = row['active'] ?? row['Active'] ?? row['isActive'] ?? 'true';
+    const activeStr = String(rawActive).trim().toLowerCase();
     const active = activeStr === 'true' || activeStr === 'yes' || activeStr === '1';
 
     if (!code) {
@@ -588,7 +596,9 @@ export function parseComplaintTypeExcel(workbook: XLSX.WorkBook): {
     const keywords = keywordsRaw || name.toLowerCase().replace(/\s+/g, ',');
     const department = String(row['department'] || row['Department'] || '').trim();
     const slaHours = parseInt(String(row['slaHours'] || row['SlaHours'] || row['sla'] || '24'), 10) || 24;
-    const activeStr = String(row['active'] || row['Active'] || row['isActive'] || 'true').trim().toLowerCase();
+    // Use ?? — see Department parser note for the FALSE-coalescing bug.
+    const rawActive = row['active'] ?? row['Active'] ?? row['isActive'] ?? 'true';
+    const activeStr = String(rawActive).trim().toLowerCase();
     const active = activeStr === 'true' || activeStr === 'yes' || activeStr === '1';
 
     if (!serviceCode) {
