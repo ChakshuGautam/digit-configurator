@@ -270,6 +270,7 @@ export interface EmployeeJurisdiction {
   boundaryType: string;
   hierarchyType: string;
   isActive?: boolean;
+  auditDetails?: { createdBy: string; createdTime: number; lastModifiedBy: string; lastModifiedTime: number };
 }
 
 export interface EmployeeAssignment {
@@ -282,6 +283,7 @@ export interface EmployeeAssignment {
   govtOrderNumber?: string;
   isCurrentAssignment: boolean;
   isHod?: boolean;
+  auditDetails?: { createdBy: string; createdTime: number; lastModifiedBy: string; lastModifiedTime: number };
 }
 
 export interface EmployeeDocument {

@@ -51,6 +51,8 @@ function toJurisdictionRow(entry: unknown, tenantId: string): EmployeeJurisdicti
     boundaryType: typeof r.boundaryType === 'string' ? r.boundaryType : '',
     hierarchyType,
     isActive: typeof r.isActive === 'boolean' ? r.isActive : true,
+    auditDetails: r.auditDetails && typeof r.auditDetails === 'object'
+      ? r.auditDetails as EmployeeJurisdiction['auditDetails'] : undefined,
     ...(typeof r.tenantId === 'string' ? { tenantId: r.tenantId } : { tenantId }),
   } as EmployeeJurisdiction & { tenantId: string };
 }

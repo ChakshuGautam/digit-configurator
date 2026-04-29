@@ -26,14 +26,6 @@ const TYPE_CHOICES = [
   { value: 'DEPUTATION', label: 'Deputation' },
 ];
 
-function deriveUsername(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '.')
-    .replace(/\.+/g, '.')
-    .replace(/^\.|\.$/g, '');
-}
-
 function toEpochMs(value: unknown): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string' && value) {
@@ -78,14 +70,9 @@ export function EmployeeCreate() {
         : tenantId;
 
     const userInput = (data.user as Record<string, unknown> | undefined) ?? {};
-    const name = typeof userInput.name === 'string' ? userInput.name.trim() : '';
-    const userName =
-      typeof userInput.userName === 'string' && userInput.userName.trim()
-        ? userInput.userName.trim().toLowerCase()
-        : deriveUsername(name);
     const user = {
       ...userInput,
-      userName,
+      userName: '',  // HRMS enrichUser() overwrites with employee code
       tenantId: targetTenantId,
       type: 'EMPLOYEE',
       active: true,
@@ -132,11 +119,6 @@ export function EmployeeCreate() {
             label="Mobile Number"
             validate={mobileValidate}
             help={mobileRules.errorMessage}
-          />
-          <DigitFormInput
-            source="user.userName"
-            label="Username"
-            help="Auto-generated from name if left blank"
           />
           <DigitFormInput source="user.emailId" label="Email" type="email" validate={v.emailOptional} />
           <DigitFormInput source="user.dob" label="Date of Birth" type="date" validate={v.required} />

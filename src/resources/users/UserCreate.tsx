@@ -1,4 +1,5 @@
 import { DigitCreate, DigitFormInput, DigitFormSelect, v } from '@/admin';
+import { useMobileValidator } from '@/admin/hrms/useMobileValidator';
 
 const GENDER_CHOICES = [
   { value: 'MALE', label: 'Male' },
@@ -15,11 +16,18 @@ const defaultRecord = {
 };
 
 export function UserCreate() {
+  const { validator: mobileValidate, rules: mobileRules } = useMobileValidator();
+
   return (
     <DigitCreate title="Create User" record={defaultRecord}>
       <DigitFormInput source="userName" label="Username" validate={v.required} />
       <DigitFormInput source="name" label="Name" validate={v.name} />
-      <DigitFormInput source="mobileNumber" label="Mobile Number" validate={v.mobile} />
+      <DigitFormInput
+        source="mobileNumber"
+        label="Mobile Number"
+        validate={mobileValidate}
+        help={mobileRules.errorMessage}
+      />
       <DigitFormInput source="emailId" label="Email" validate={v.emailOptional} />
       <DigitFormSelect
         source="gender"
