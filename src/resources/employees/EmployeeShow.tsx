@@ -27,7 +27,7 @@ export function EmployeeShow() {
           <div className="space-y-6">
             {/* Header Section */}
             <FieldSection title="Employee Info">
-              <FieldRow label="Code">{String(rec.code ?? '')}</FieldRow>
+              <FieldRow label="Employee Code">{String(rec.code ?? '')}</FieldRow>
               <FieldRow label="Name">{String(user?.name ?? '')}</FieldRow>
               <FieldRow label="Mobile">{String(user?.mobileNumber ?? '')}</FieldRow>
               <FieldRow label="Status"><StatusChip value={rec.employeeStatus} /></FieldRow>
@@ -36,9 +36,10 @@ export function EmployeeShow() {
               <FieldRow label="Date of Appointment"><DateField value={rec.dateOfAppointment} showTime={false} /></FieldRow>
             </FieldSection>
 
-            {/* User Section */}
+            {/* User Account. user.userName intentionally omitted — HRMS
+                overwrites it with rec.code, so showing it as "Username" just
+                duplicates "Employee Code" under a misleading label (#460). */}
             <FieldSection title="User Account">
-              <FieldRow label="Username">{String(user?.userName ?? '')}</FieldRow>
               <FieldRow label="Gender">{String(user?.gender ?? '--')}</FieldRow>
               <FieldRow label="Date of Birth"><DateField value={user?.dob} showTime={false} /></FieldRow>
               <FieldRow label="Email">{String(user?.emailId ?? '--')}</FieldRow>
