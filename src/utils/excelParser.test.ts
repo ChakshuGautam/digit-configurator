@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as XLSX from 'xlsx';
-import { parseDepartmentExcel, parseDesignationExcel, parseComplaintTypeExcel } from './excelParser';
+import { parseDepartmentExcel, parseDesignationExcel, parseComplaintTypeExcel, parseBoundaryExcel } from './excelParser';
 
 // LibreOffice / Google Sheets convert TRUE / FALSE cells to JS booleans
 // when xlsx parses them. Before the ?? fix the parser used `||` for the
@@ -58,5 +58,25 @@ describe('Excel boolean coalescing (active column)', () => {
     ]);
     const { data } = parseComplaintTypeExcel(wb);
     expect(data[0]?.active).toBe(false);
+  });
+});
+
+describe('Boundary coordinate parsing', () => {
+  it('keeps 0.0 latitude / longitude as 0 (not undefined)', () => {
+    // `parseFloat(...) || undefined` would coerce a legitimate 0 to
+    // undefined — the Equator + Greenwich Meridian edge. Use NaN-check.
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet([
+      { code: 'EQ_GP', name: 'Equator + Greenwich', boundaryType: 'Ward', latitude: 0, longitude: 0 },
+      { code: 'NA', name: 'No coords', boundaryType: 'Ward' },
+    ]);
+    XLSX.utils.book_append_sheet(wb, ws, 'Boundary');
+    const { data } = parseBoundaryExcel(wb);
+    const eq = data.find((r) => r.code === 'EQ_GP');
+    const na = data.find((r) => r.code === 'NA');
+    expect(eq?.latitude).toBe(0);
+    expect(eq?.longitude).toBe(0);
+    expect(na?.latitude).toBeUndefined();
+    expect(na?.longitude).toBeUndefined();
   });
 });

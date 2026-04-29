@@ -52,6 +52,42 @@ describe('createDigitDataProvider', () => {
     );
   });
 
+  it('strips id and underscore-prefixed metadata from MDMS create payload', async () => {
+    // Same family as the update sanitize fix from PR #40 — a default-
+    // record that includes `id` (some forms set id == code on create)
+    // or any normalised `_*` field would otherwise pass through
+    // mdmsCreate and get rejected by additionalProperties:false.
+    let captured: Record<string, unknown> | null = null;
+    mock.method(client, 'mdmsCreate', async (_t: string, _s: string, _u: string, data: Record<string, unknown>) => {
+      captured = data;
+      return {
+        id: 'new-id',
+        tenantId: 'pg',
+        schemaCode: 'common-masters.Department',
+        uniqueIdentifier: 'DEPT_X',
+        data,
+        isActive: true,
+        auditDetails: { createdBy: 'x', lastModifiedBy: 'x', createdTime: 1, lastModifiedTime: 1 },
+      };
+    });
+
+    const dp = createDigitDataProvider(client, 'pg');
+    await dp.create('departments', {
+      data: {
+        id: 'DEPT_X',
+        code: 'DEPT_X',
+        name: 'pw create',
+        active: true,
+        _isActive: true,
+        _uniqueIdentifier: 'DEPT_X',
+        _mdmsId: 'should-be-stripped',
+      },
+    });
+
+    assert.ok(captured, 'mdmsCreate should have been called');
+    assert.deepEqual(Object.keys(captured!).sort(), ['active', 'code', 'name']);
+  });
+
   it('strips id and underscore-prefixed metadata from MDMS update payload', async () => {
     // The form payload includes the ra-admin id and the
     // _-prefixed fields normalizeMdmsRecord glued on. MDMS schemas
