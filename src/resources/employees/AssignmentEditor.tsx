@@ -36,6 +36,8 @@ function toAssignmentRow(entry: unknown): EmployeeAssignment {
     govtOrderNumber: typeof r.govtOrderNumber === 'string' ? r.govtOrderNumber : undefined,
     isCurrentAssignment: typeof r.isCurrentAssignment === 'boolean' ? r.isCurrentAssignment : false,
     isHod: typeof r.isHod === 'boolean' ? r.isHod : undefined,
+    auditDetails: r.auditDetails && typeof r.auditDetails === 'object'
+      ? r.auditDetails as EmployeeAssignment['auditDetails'] : undefined,
   };
 }
 
@@ -59,7 +61,17 @@ export function AssignmentEditor({
   label = 'Assignments',
   help,
 }: AssignmentEditorProps) {
-  const { id, field } = useInput({ source });
+  const validate = (value: unknown) => {
+    if (!Array.isArray(value) || value.length === 0) return undefined;
+    for (const entry of value) {
+      const row = toAssignmentRow(entry);
+      if (!row.department) return 'Each assignment must have a department selected';
+      if (!row.designation) return 'Each assignment must have a designation selected';
+    }
+    return undefined;
+  };
+
+  const { id, field, fieldState } = useInput({ source, validate });
 
   const rows: EmployeeAssignment[] = useMemo(() => {
     if (!Array.isArray(field.value)) return [];
@@ -266,7 +278,12 @@ export function AssignmentEditor({
         </div>
       )}
 
-      {help && <p className="mt-1 text-xs text-muted-foreground">{help}</p>}
+      {fieldState.error?.message && (
+        <p className="mt-1 text-xs text-destructive" role="alert">{fieldState.error.message}</p>
+      )}
+      {!fieldState.error?.message && help && (
+        <p className="mt-1 text-xs text-muted-foreground">{help}</p>
+      )}
     </div>
   );
 }
