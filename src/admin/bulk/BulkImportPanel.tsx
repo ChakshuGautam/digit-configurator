@@ -1,5 +1,6 @@
 import { useCallback, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   Download,
@@ -92,6 +93,7 @@ export function BulkImportPanel<Row extends BulkRow>({
   completionExtras,
 }: BulkImportPanelProps<Row>) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>('landing');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -172,8 +174,15 @@ export function BulkImportPanel<Row extends BulkRow>({
       }
       setProgress(Math.round(((i + 1) / valid.length) * 100));
     }
+    // Bust react-query cache so the list view we navigate back to
+    // shows the fresh count, not the pre-import snapshot. Previously
+    // the operator had to manually refresh — the bug Gurjeet flagged
+    // on egovernments/CCRS#472. invalidateQueries() with no key
+    // invalidates everything, which is overkill but safe (the SPA's
+    // remaining queries are cheap to refetch).
+    await queryClient.invalidateQueries();
     setStep('complete');
-  }, [rows, createOne, columns]);
+  }, [rows, createOne, columns, queryClient]);
 
   const validCount = rows.filter((r) => r.status === 'valid').length;
   const errorCount = rows.length - validCount;

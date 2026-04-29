@@ -179,11 +179,15 @@ export function parseTenantExcel(workbook: XLSX.WorkBook): {
     'logoPath', 'LogoPath', 'Logo Path', 'Logo File Path*', 'Logo File Path'
   );
 
-  // Parse coordinates
+  // Parse coordinates. `parseFloat(...) || undefined` coerces a legit
+  // 0 (Greenwich Meridian / Equator) to undefined — use NaN-check
+  // instead so 0.0 round-trips.
   const latitudeStr = getValue(row, 'latitude', 'Latitude');
   const longitudeStr = getValue(row, 'longitude', 'Longitude');
-  const latitude = latitudeStr ? parseFloat(latitudeStr) || undefined : undefined;
-  const longitude = longitudeStr ? parseFloat(longitudeStr) || undefined : undefined;
+  const latNum = latitudeStr ? parseFloat(latitudeStr) : NaN;
+  const lngNum = longitudeStr ? parseFloat(longitudeStr) : NaN;
+  const latitude = Number.isFinite(latNum) ? latNum : undefined;
+  const longitude = Number.isFinite(lngNum) ? lngNum : undefined;
 
   // Validate required fields
   if (!tenantCode) {
@@ -340,9 +344,13 @@ export function parseBoundaryExcel(workbook: XLSX.WorkBook): {
     const boundaryType = String(row['boundaryType'] || row['BoundaryType'] || row['type'] || '').trim();
     const parentCode = String(row['parentCode'] || row['ParentCode'] || row['parent'] || '').trim() || undefined;
 
-    // Parse coordinates
-    const latitude = parseFloat(String(row['latitude'] || row['Latitude'] || '0')) || undefined;
-    const longitude = parseFloat(String(row['longitude'] || row['Longitude'] || '0')) || undefined;
+    // Parse coordinates — keep 0.0 as a legit value (Equator / Greenwich).
+    const latRaw = row['latitude'] ?? row['Latitude'];
+    const lngRaw = row['longitude'] ?? row['Longitude'];
+    const latNum = latRaw == null || latRaw === '' ? NaN : parseFloat(String(latRaw));
+    const lngNum = lngRaw == null || lngRaw === '' ? NaN : parseFloat(String(lngRaw));
+    const latitude = Number.isFinite(latNum) ? latNum : undefined;
+    const longitude = Number.isFinite(lngNum) ? lngNum : undefined;
 
     if (!code) {
       errors.push({

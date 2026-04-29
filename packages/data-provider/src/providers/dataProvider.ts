@@ -529,8 +529,19 @@ export function createDigitDataProvider(client: DigitApiClient, tenantId: string
     async create(resource, params): Promise<CreateResult> {
       const config = resolveConfig(resource);
       if (config.type === 'mdms') {
-        const data = params.data as Record<string, unknown>;
-        const uid = String(data[config.idField] || data.code || '');
+        const incoming = params.data as Record<string, unknown>;
+        // Same metadata-strip the update path applies (PR #40). The
+        // create path didn't have it, so any defaultRecord that included
+        // `id` (some forms set id == code on create) or any normalised
+        // `_*` field would pass straight through to mdmsCreate and
+        // get rejected by additionalProperties:false schemas.
+        const data: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(incoming)) {
+          if (key === 'id') continue;
+          if (key.startsWith('_')) continue;
+          data[key] = value;
+        }
+        const uid = String(incoming[config.idField] || data.code || '');
         const record = await client.mdmsCreate(tenantId, config.schema!, uid, data);
         return { data: normalizeMdmsRecord(record, config) };
       }
