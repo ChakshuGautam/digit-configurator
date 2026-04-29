@@ -19,14 +19,20 @@ function flatten(obj: unknown, prefix = ''): Record<string, string> {
 }
 
 /**
- * Mirror of the runtime SEMANTIC_EXPANSION (theflywheel/digit-ui-esbuild
- * src/theme/applyTheme.js): each v2 input back-fills the legacy v1 paths the
- * preview already targets. The preview was built against v1 paths; rather
- * than rewrite every `data-token` attribute, we project v2 → v1 here so a
- * Brand/Brand-on/Surface-header/etc. value flows into all the v1 paths the
- * preview already reads.
+ * Mirror of the runtime SEMANTIC_EXPANSION + V3_EXPANSION (theflywheel/
+ * digit-ui-esbuild src/theme/applyTheme.js). Each v2/v3 input back-fills the
+ * v1 paths the preview's data-token attributes already target. The preview
+ * was built against v1 paths; rather than rewrite every data-token, we
+ * project v2 and v3 → v1 here so any input shape drives the preview.
+ *
+ * For v3, each section's input maps to the closest v1 path that the preview
+ * already renders. Where the preview doesn't have a dedicated visual for a
+ * granular role (e.g. button-primary-bg-hover, sidebar-selected-text), the
+ * input is omitted from this map and only takes effect on the live UI via
+ * the surgical CSS overrides in overrides.css.
  */
 const V2_TO_V1_FALLBACK: Record<string, string[]> = {
+  // v2
   brand: ['primary.main'],
   'brand-on': ['primary.dark', 'primary.accent', 'link.normal', 'link.hover', 'text.heading'],
   'surface-header': ['secondary', 'digitv2.header-sidenav'],
@@ -40,6 +46,46 @@ const V2_TO_V1_FALLBACK: Record<string, string[]> = {
   info: ['digitv2.alert-info', 'info-dark'],
   warning: ['warning-dark'],
   'selected-bg': ['primary.selected-bg', 'digitv2.primary-bg'],
+  // v3 — main palette
+  'primary-1': ['primary.dark', 'primary.accent', 'link.normal', 'link.hover', 'text.heading', 'secondary', 'digitv2.header-sidenav'],
+  'primary-2': ['primary.main'],
+  'primary-1-bg': ['primary.selected-bg', 'digitv2.primary-bg'],
+  // v3 — text
+  'text-heading': ['text.heading'],
+  // v3 — page
+  'page-bg': ['grey.bg'],
+  'page-secondary-bg': ['grey.light', 'grey.lighter'],
+  // v3 — buttons (preview shows Primary + Secondary buttons)
+  'button-primary-bg-default': ['primary.main'],
+  'button-primary-text': ['primary.dark'],
+  'button-secondary-bg-default': ['grey.bg'],
+  'button-secondary-text': ['primary.dark'],
+  'button-tertiary-text': ['link.normal'],
+  // v3 — inputs (preview has a disabled input)
+  'input-bg': ['grey.bg'],
+  'input-border-default': ['input-border'],
+  'input-text': ['text.primary'],
+  'input-placeholder': ['text.muted'],
+  // v3 — header / sidebar (preview shows both)
+  'header-bg': ['digitv2.header-sidenav'],
+  'header-text': ['secondary'],
+  'sidebar-bg': ['digitv2.header-sidenav'],
+  'sidebar-selected-bg': ['primary.selected-bg'],
+  'sidebar-selected-text': ['primary.main'],
+  // v3 — status (preview shows alerts)
+  'status-success-text': ['success'],
+  'status-success-bg': ['digitv2.alert-success-bg'],
+  'status-error-text': ['error', 'error-dark'],
+  'status-error-bg': ['digitv2.alert-error-bg'],
+  'status-warning-text': ['warning-dark'],
+  'status-info-text': ['info-dark', 'digitv2.alert-info'],
+  'status-info-bg': ['digitv2.alert-info-bg'],
+  // v3 — charts
+  'chart-1': ['digitv2.chart-1'],
+  'chart-2': ['digitv2.chart-2'],
+  'chart-3': ['digitv2.chart-3'],
+  'chart-4': ['digitv2.chart-4'],
+  'chart-5': ['digitv2.chart-5'],
 };
 
 /** Apply v2 → v1 fan-out so the preview reads consistent values whether the
