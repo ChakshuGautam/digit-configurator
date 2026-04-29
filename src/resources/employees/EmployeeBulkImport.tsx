@@ -276,7 +276,7 @@ export function EmployeeBulkImport() {
   );
 
   const handleDownloadCreds = useCallback(() => {
-    const rowsOut = [['Name', 'Username', 'Mobile', 'Password']];
+    const rowsOut = [['Name', 'Employee Code', 'Mobile', 'Password']];
     for (const emp of createdEmployees) {
       rowsOut.push([emp.user.name, emp.user.userName, emp.user.mobileNumber, 'eGov@123']);
     }

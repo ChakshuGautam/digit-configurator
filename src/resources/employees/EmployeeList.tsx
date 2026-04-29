@@ -18,11 +18,11 @@ const filters = [
     ]}
     alwaysOn
   />,
-  <TextFilterInput key="code" source="code" label="Code" />,
+  <TextFilterInput key="code" source="code" label="Employee Code" />,
 ];
 
 const columns: DigitColumn[] = [
-  { source: 'code', label: 'app.fields.code' },
+  { source: 'code', label: 'Employee Code' },
   { source: 'user.name', label: 'app.fields.name' },
   { source: 'user.mobileNumber', label: 'app.fields.mobile' },
   {

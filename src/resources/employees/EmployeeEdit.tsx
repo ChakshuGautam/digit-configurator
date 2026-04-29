@@ -231,7 +231,6 @@ export function EmployeeEdit() {
       <FieldSection title="Employee Info">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <DigitFormInput source="code" label="Employee Code" disabled />
-          <DigitFormInput source="user.userName" label="Username" disabled />
           <DigitFormInput source="user.name" label="Name" validate={v.name} />
           <DigitFormInput
             source="user.mobileNumber"
