@@ -4,11 +4,12 @@ import { DeactivationGuard } from '@/admin/DeactivationGuard';
 import { useShowController } from 'ra-core';
 
 export function DepartmentEdit() {
+  // Department schema only allows {code, name, active} — see
+  // DepartmentCreate for the schema vs UI mismatch we used to ship.
   return (
     <DigitEdit title="Edit Department">
       <DigitFormInput source="code" label="Code" disabled />
       <DigitFormInput source="name" label="Name" validate={v.name} />
-      <DigitFormInput source="description" label="Description" />
       <BooleanInput source="active" label="Active" />
       <DeactivationGuardForDepartment />
     </DigitEdit>

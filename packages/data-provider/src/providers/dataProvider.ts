@@ -643,7 +643,21 @@ export function createDigitDataProvider(client: DigitApiClient, tenantId: string
         const records = await client.mdmsSearch(tenantId, config.schema!, { uniqueIdentifiers: [String(params.id)] });
         const existing = records.find((r) => r.isActive);
         if (!existing) throw new Error(`Record not found: ${params.id}`);
-        existing.data = { ...existing.data, ...(params.data as Record<string, unknown>) };
+        // Strip the metadata that normalizeMdmsRecord glued onto the
+        // record for react-admin's benefit (id, _isActive, _mdmsId,
+        // _uniqueIdentifier, _auditDetails, _schemaCode, anything starting
+        // with _). MDMS schemas declare additionalProperties:false, so
+        // any of these fields makes the _update payload fail with
+        // INVALID_REQUEST_ADDITIONALPROPERTIES* (closes
+        // egovernments/CCRS#472 — Department update).
+        const incoming = params.data as Record<string, unknown>;
+        const sanitized: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(incoming)) {
+          if (key === 'id') continue;
+          if (key.startsWith('_')) continue;
+          sanitized[key] = value;
+        }
+        existing.data = { ...existing.data, ...sanitized };
         const updated = await client.mdmsUpdate(existing, true);
         return { data: normalizeMdmsRecord(updated, config) };
       }
