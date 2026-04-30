@@ -36,6 +36,7 @@ import {
   ApiClientError,
 } from '@/api';
 import { parseExcelFile, parseEmployeeExcel } from '@/utils/excelParser';
+import { downloadEmployeeTemplate } from '@/utils/templateBuilder';
 import type {
   EmployeeExcelRow,
   Employee,
@@ -306,7 +307,7 @@ export default function Phase4Page() {
   };
 
   const handleDownloadTemplate = () => {
-    alert('Template download would start here.');
+    downloadEmployeeTemplate();
   };
 
   const handleDownloadCredentials = () => {

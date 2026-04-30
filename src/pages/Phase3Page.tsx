@@ -31,6 +31,7 @@ import {
   parseDesignationExcel,
   parseComplaintTypeExcel,
 } from '@/utils/excelParser';
+import { downloadCommonMastersTemplate } from '@/utils/templateBuilder';
 import type {
   DepartmentExcelRow,
   DesignationExcelRow,
@@ -230,7 +231,7 @@ export default function Phase3Page() {
   };
 
   const handleDownloadTemplate = () => {
-    alert('Template download would start here.');
+    downloadCommonMastersTemplate();
   };
 
   return (
