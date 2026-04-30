@@ -51,10 +51,24 @@ function clientSort(records: RaRecord[], field: string, order: string): RaRecord
   });
 }
 
+// Internal filter key allowing a caller to pin a single getList to a tenant
+// other than the session tenant (e.g. EmployeeCreate's dept/desig pickers,
+// where the form lets the operator pick a target tenant that differs from
+// the session ADMIN tenant).
+const TENANT_OVERRIDE_KEY = '__tenantId';
+
+function pickTenant(tenantId: string, filter?: Record<string, unknown>): string {
+  const override = filter?.[TENANT_OVERRIDE_KEY];
+  return typeof override === 'string' && override.trim() ? override.trim() : tenantId;
+}
+
 function clientFilter(records: RaRecord[], filter: Record<string, unknown>): RaRecord[] {
   if (!filter || Object.keys(filter).length === 0) return records;
   return records.filter((record) =>
     Object.entries(filter).every(([key, value]) => {
+      // Internal control keys never participate in record-level filtering;
+      // they're consumed by fetchers (e.g. mdmsGetList honours __tenantId).
+      if (key === TENANT_OVERRIDE_KEY) return true;
       if (key === 'q' && typeof value === 'string') {
         const q = value.toLowerCase();
         return JSON.stringify(record).toLowerCase().includes(q);
@@ -72,8 +86,9 @@ function clientPaginate(records: RaRecord[], page: number, perPage: number): RaR
 
 // --- Service-specific fetchers ---
 
-async function mdmsGetList(client: DigitApiClient, config: ResourceConfig, tenantId: string): Promise<RaRecord[]> {
-  const records = await client.mdmsSearch(tenantId, config.schema!, { limit: 500 });
+async function mdmsGetList(client: DigitApiClient, config: ResourceConfig, tenantId: string, filter?: Record<string, unknown>): Promise<RaRecord[]> {
+  const tenant = pickTenant(tenantId, filter);
+  const records = await client.mdmsSearch(tenant, config.schema!, { limit: 500 });
   return records.filter((r) => r.isActive).map((r) => normalizeMdmsRecord(r, config));
 }
 
@@ -339,7 +354,7 @@ export function createDigitDataProvider(client: DigitApiClient, tenantId: string
   async function fetchAll(resource: string, filter?: Record<string, unknown>): Promise<RaRecord[]> {
     const config = resolveConfig(resource);
     switch (config.type) {
-      case 'mdms': return mdmsGetList(client, config, tenantId);
+      case 'mdms': return mdmsGetList(client, config, tenantId, filter);
       case 'hrms': return hrmsGetList(client, config, tenantId);
       case 'boundary': return boundaryGetList(client, config, tenantId);
       case 'pgr': return pgrGetList(client, config, tenantId, filter);
