@@ -28,6 +28,7 @@ import { SubmitBar } from '@/components/digit/SubmitBar';
 import { Banner } from '@/components/digit/Banner';
 import { boundaryService, localizationService, ApiClientError } from '@/api';
 import { parseExcelFile, parseBoundaryExcel } from '@/utils/excelParser';
+import { downloadBoundaryTemplate } from '@/utils/templateBuilder';
 import type { BoundaryHierarchy, Boundary, BoundaryExcelRow } from '@/api/types';
 
 type Step = 'landing' | 'create-hierarchy' | 'select-hierarchy' | 'template' | 'upload' | 'verify' | 'complete';
@@ -275,14 +276,17 @@ export default function Phase2Page() {
     navigate('/phase/3');
   };
 
-  const handleDownloadTemplate = () => {
-    // For now, just show an alert about the template
-    alert('Template download would start here.');
-  };
-
   const getHierarchyLevels = (hierarchy: BoundaryHierarchy): string[] => {
     if (!hierarchy.boundaryHierarchy) return [];
     return hierarchy.boundaryHierarchy.map(level => level.boundaryType);
+  };
+
+  const handleDownloadTemplate = () => {
+    const levels = selectedHierarchy
+      ? getHierarchyLevels(selectedHierarchy)
+      : hierarchyLevels;
+    const type = selectedHierarchy?.hierarchyType || hierarchyType || 'ADMIN';
+    downloadBoundaryTemplate(type, levels);
   };
 
   return (
