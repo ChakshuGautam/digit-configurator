@@ -203,14 +203,24 @@ class DigitApiClient {
       body: formData,
     });
 
-    if (!response.ok) {
-      throw new Error(`File upload failed: ${response.status}`);
+    // Parse the body either way — filestore returns helpful messages on 4xx
+    // (e.g. "extension does not match the file format") that we should
+    // surface to the user instead of dropping in favour of a bare status code.
+    let data: { files?: Array<{ fileStoreId: string; fileName: string }>; Errors?: ApiError[] } | null = null;
+    try {
+      data = await response.json();
+    } catch {
+      // Non-JSON body (rare); fall through to the status-only error below.
     }
 
-    const data = await response.json();
+    if (!response.ok) {
+      const serverMsg = data?.Errors?.[0]?.message;
+      throw new Error(serverMsg || `File upload failed: ${response.status}`);
+    }
+
     return {
-      fileStoreId: data.files[0].fileStoreId,
-      fileName: data.files[0].fileName,
+      fileStoreId: data!.files![0].fileStoreId,
+      fileName: data!.files![0].fileName,
     };
   }
 }
