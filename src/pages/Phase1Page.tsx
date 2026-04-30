@@ -220,12 +220,18 @@ export default function Phase1Page() {
     setLoading(true);
     setError(null);
 
-    // Basic client-side guard so users see the obvious cases instantly
-    // instead of waiting for a filestore round-trip.
-    if (!file.type.startsWith('image/')) {
+    // Mirror egov-filestore's ALLOWED_FORMATS_MAP for image uploads so users
+    // see the obvious cases instantly instead of waiting for a 400.
+    // Browser-reported MIME (file.type) is set when the file was saved with a
+    // matching extension, but is not authoritative — the backend re-detects
+    // via Tika and rejects extension/content mismatches with a separate 400.
+    const ALLOWED_EXTS = ['jpg', 'jpeg', 'png', 'svg'];
+    const ALLOWED_MIMES = ['image/jpeg', 'image/jpg', 'image/png', 'image/svg+xml'];
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+    if (!ALLOWED_EXTS.includes(ext) || (file.type && !ALLOWED_MIMES.includes(file.type))) {
       setBrandingErrors(prev => ({
         ...prev,
-        [type]: `Expected an image file, got "${file.type || 'unknown'}".`,
+        [type]: `Use JPG, PNG, or SVG (got "${file.name}"${file.type ? `, ${file.type}` : ''}). Many phone-camera images are HEIC/WebP — re-export as JPG.`,
       }));
       setLoading(false);
       return;
