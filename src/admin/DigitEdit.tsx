@@ -1,5 +1,5 @@
 import React from 'react';
-import { EditBase, useEditContext, Form, useResourceContext, type TransformData, type RaRecord } from 'ra-core';
+import { EditBase, useEditContext, Form, useResourceContext, useRedirect, type TransformData, type RaRecord } from 'ra-core';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
 import { DigitCard } from '@/components/digit/DigitCard';
@@ -37,6 +37,8 @@ export interface DigitEditProps {
   resource?: string;
   /** Record id (optional, from URL by default) */
   id?: string | number;
+  /** Where to redirect after successful update (default: "list") */
+  redirect?: 'list' | 'edit' | 'show' | false;
   /** Optional pre-submit transform */
   transform?: TransformData;
 }
@@ -157,15 +159,19 @@ function DigitEditContent({
   );
 }
 
-export function DigitEdit({ title, children, resource, id, transform }: DigitEditProps) {
+export function DigitEdit({ title, children, resource, id, redirect = 'list', transform }: DigitEditProps) {
   const { info, capture, clear } = useMutationError();
   const contextResource = useResourceContext();
+  const redirectTo = useRedirect();
   const effectiveResource = resource ?? contextResource;
   return (
     <EditBase
       resource={resource}
       id={id}
       mutationMode="pessimistic"
+      // See note in DigitCreate: ra-core treats a custom mutationOptions.onSuccess
+      // as a full override of its post-update handler and silently drops the
+      // built-in redirect. Drive the redirect ourselves from inside onSuccess.
       transform={transform}
       mutationOptions={{
         onError: (err) => capture(err),
@@ -176,6 +182,9 @@ export function DigitEdit({ title, children, resource, id, transform }: DigitEdi
             title: `${prettyResourceSingular(effectiveResource)} updated`,
             description: label !== 'Record' ? label : undefined,
           });
+          if (redirect && effectiveResource) {
+            redirectTo(redirect, effectiveResource, (data as RaRecord | undefined)?.id, data as RaRecord | undefined);
+          }
         },
       }}
     >
