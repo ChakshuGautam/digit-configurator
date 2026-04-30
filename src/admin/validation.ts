@@ -105,3 +105,21 @@ export const slaHours = composeValidators(
 
 // Re-export composeValidators for custom combos
 export { composeValidators };
+
+// ra-core's `composeValidators` reduces multiple validators into a single
+// function that does NOT carry `.isRequired`, so `useInput.isRequired` returns
+// false and DigitFormInput skips the visible "*" mark even when one of the
+// composed validators is `required`. Mark the composed result so the form
+// surfaces the asterisk (closes egovernments/CCRS#462).
+const flagRequired = (fn: ReturnType<typeof composeValidators>) => {
+  (fn as unknown as { isRequired?: boolean }).isRequired = true;
+  return fn;
+};
+
+flagRequired(name);
+flagRequired(mobileRequired);
+flagRequired(mobileKERequired);
+flagRequired(emailRequired);
+flagRequired(codeRequired);
+flagRequired(positiveInt);
+flagRequired(slaHours);
