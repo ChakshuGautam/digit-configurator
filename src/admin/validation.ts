@@ -34,6 +34,17 @@ export const phone = raRegex(
   'Enter a valid 10-digit mobile number',
 );
 
+/**
+ * Kenya citizen mobile: 9 digits starting with 7 or 1, optionally
+ * prefixed with 0. Matches MDMS `ValidationConfigs.mobileNumberValidation`
+ * at tenant `ke`. NOT clamped to the HRMS 10-digit floor — citizens have
+ * no HRMS-side @Pattern constraint.
+ */
+export const phoneKE = raRegex(
+  /^0?[17][0-9]{8}$/,
+  'Enter a valid Kenyan mobile starting with 7 or 1 (e.g. 712345678)',
+);
+
 export const code = raRegex(
   /^[A-Za-z0-9][A-Za-z0-9_.\-/]*$/,
   'Use letters, numbers, underscores, dots, hyphens, or slashes',
@@ -69,6 +80,9 @@ export const mobileRequired = composeValidators(required, phone);
 /** Mobile number: optional, but if filled must be valid */
 export const mobile = phone;
 
+/** Kenya citizen mobile: required, 9-or-10-digit Kenyan format */
+export const mobileKERequired = composeValidators(required, phoneKE);
+
 /** Email: optional, but if filled must be valid */
 export const emailOptional = email;
 
@@ -91,3 +105,21 @@ export const slaHours = composeValidators(
 
 // Re-export composeValidators for custom combos
 export { composeValidators };
+
+// ra-core's `composeValidators` reduces multiple validators into a single
+// function that does NOT carry `.isRequired`, so `useInput.isRequired` returns
+// false and DigitFormInput skips the visible "*" mark even when one of the
+// composed validators is `required`. Mark the composed result so the form
+// surfaces the asterisk (closes egovernments/CCRS#462).
+const flagRequired = (fn: ReturnType<typeof composeValidators>) => {
+  (fn as unknown as { isRequired?: boolean }).isRequired = true;
+  return fn;
+};
+
+flagRequired(name);
+flagRequired(mobileRequired);
+flagRequired(mobileKERequired);
+flagRequired(emailRequired);
+flagRequired(codeRequired);
+flagRequired(positiveInt);
+flagRequired(slaHours);

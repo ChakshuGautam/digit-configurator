@@ -181,23 +181,18 @@ export function EmployeeEdit() {
     sort: { field: 'code', order: 'ASC' },
   });
   const reasonChoices = useMemo(() => {
-    // The hardcoded list is a floor, not a fallback — a thinly-seeded MDMS
-    // (e.g. Nairobi ships with only ORDERBYCOMMISSIONER + OTHERS) should not
-    // hide standard HR exits. Merge MDMS with defaults and dedup by code;
-    // MDMS entries win on collision so operators can still rename labels
-    // centrally.
-    const DEFAULTS = [
-      { value: 'OTHERS', label: 'Others' },
-      { value: 'RETIRED', label: 'Retired' },
-      { value: 'TERMINATED', label: 'Terminated' },
-      { value: 'RESIGNED', label: 'Resigned' },
-    ];
+    // HRMS validates the submitted reason against MDMS `egov-hrms.DeactivationReason`
+    // and rejects anything else with ERR_HRMS_INVALID_DEACT_REASON, so we cannot
+    // surface UI-only defaults the server doesn't know about. If MDMS is empty,
+    // fall back to OTHERS — egov-hrms ships it as a built-in code.
     const mdmsChoices = (reasonsList ?? []).map((r) => {
       const code = String((r as Record<string, unknown>).code ?? r.id);
       return { value: code, label: code };
     });
-    const seen = new Set(mdmsChoices.map((c) => c.value));
-    return [...mdmsChoices, ...DEFAULTS.filter((d) => !seen.has(d.value))];
+    if (mdmsChoices.length === 0) {
+      return [{ value: 'OTHERS', label: 'Others' }];
+    }
+    return mdmsChoices;
   }, [reasonsList]);
 
   const transform = (data: Record<string, unknown>): Record<string, unknown> => {
