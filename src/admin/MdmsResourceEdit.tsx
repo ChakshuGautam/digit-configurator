@@ -1,5 +1,6 @@
 import { DigitEdit } from './DigitEdit';
 import { DigitFormInput } from './DigitFormInput';
+import { BooleanInput } from './widgets/BooleanInput';
 import { WidgetForFieldSpec } from './widgets';
 import { useEditContext, useResourceContext } from 'ra-core';
 import { getResourceConfig, getResourceLabel } from '@/providers/bridge';
@@ -42,6 +43,14 @@ function MdmsEditFields() {
 
         // Skip complex objects the descriptor didn't handle — same behavior as before.
         if (value != null && typeof value === 'object') return null;
+
+        // Boolean fields must render as a checkbox so the form value stays a
+        // real bool. Falling back to a text input lets operators type 'false',
+        // which the MDMS JSON Schema rejects with `expected type: Boolean,
+        // found: String` (closes egovernments/CCRS#483).
+        if (typeof value === 'boolean') {
+          return <BooleanInput key={key} source={key} label={displayKey} />;
+        }
 
         return (
           <DigitFormInput

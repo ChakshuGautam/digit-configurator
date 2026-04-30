@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useFormContext, useWatch } from 'react-hook-form';
 import { useInput, useGetList, type RaRecord } from 'ra-core';
 import { Plus, Trash2 } from 'lucide-react';
 import {
@@ -66,14 +67,25 @@ export function AssignmentEditor({
     return (field.value as unknown[]).map(toAssignmentRow);
   }, [field.value]);
 
+  // Pin the dept/desig fetches to the tenant the operator picked in the
+  // form. Without this, the pickers list MDMS records from the session
+  // tenant (root `ke` for ADMIN), but HRMS validates the submitted code
+  // against the target tenant — picking root-only codes drops every
+  // create with ERR_HRMS_INVALID_DEPT.
+  const formContext = useFormContext();
+  const formTenantId = useWatch({ control: formContext?.control, name: 'tenantId' }) as
+    | string
+    | undefined;
+  const tenantFilter = formTenantId ? { __tenantId: formTenantId } : undefined;
+
   const { data: departments, isLoading: departmentsLoading } = useGetList<NamedRecord>(
     'departments',
-    { pagination: { page: 1, perPage: 1000 }, sort: { field: 'name', order: 'ASC' } },
+    { pagination: { page: 1, perPage: 1000 }, sort: { field: 'name', order: 'ASC' }, filter: tenantFilter },
   );
 
   const { data: designations, isLoading: designationsLoading } = useGetList<NamedRecord>(
     'designations',
-    { pagination: { page: 1, perPage: 1000 }, sort: { field: 'name', order: 'ASC' } },
+    { pagination: { page: 1, perPage: 1000 }, sort: { field: 'name', order: 'ASC' }, filter: tenantFilter },
   );
 
   const writeRows = (next: EmployeeAssignment[]) => {
