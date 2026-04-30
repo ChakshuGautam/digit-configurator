@@ -1,5 +1,5 @@
 import React from 'react';
-import { CreateBase, useCreateContext, Form, useResourceContext, type TransformData, type RaRecord } from 'ra-core';
+import { CreateBase, useCreateContext, Form, useResourceContext, useRedirect, type TransformData, type RaRecord } from 'ra-core';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
 import { DigitCard } from '@/components/digit/DigitCard';
@@ -118,12 +118,17 @@ function DigitCreateContent({
 export function DigitCreate({ title, children, resource, record, redirect = 'list', transform }: DigitCreateProps) {
   const { info, capture, clear } = useMutationError();
   const contextResource = useResourceContext();
+  const redirectTo = useRedirect();
   const effectiveResource = resource ?? contextResource;
   return (
     <CreateBase
       resource={resource}
       record={record}
-      redirect={redirect}
+      // Don't pass `redirect` to CreateBase — when `mutationOptions.onSuccess`
+      // is provided, ra-core treats it as a full override of the default
+      // post-create handler and skips its built-in redirect step. We need
+      // the toast (next block) AND the redirect, so we drive the redirect
+      // ourselves from inside onSuccess.
       transform={transform}
       mutationOptions={{
         onError: (err) => capture(err),
@@ -137,6 +142,14 @@ export function DigitCreate({ title, children, resource, record, redirect = 'lis
             title: `${prettyResourceSingular(effectiveResource)} created`,
             description: label !== 'Record' ? label : undefined,
           });
+          // Manually fire the redirect since our custom onSuccess swallows
+          // ra-core's default redirect side-effect. Without this the form
+          // stayed populated after a successful create, leaving operators
+          // confused about whether the submit actually went through
+          // (closes egovernments/CCRS#471).
+          if (redirect && effectiveResource) {
+            redirectTo(redirect, effectiveResource, (data as RaRecord | undefined)?.id, data as RaRecord | undefined);
+          }
         },
       }}
     >
