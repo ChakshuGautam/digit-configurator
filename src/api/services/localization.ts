@@ -74,6 +74,20 @@ export const localizationService = {
   },
 
   // ============================================
+  // Cache Bust
+  // ============================================
+
+  /** Tell the localization service to drop its in-memory per-tenant cache.
+   *  Required after every write — without it `_search` keeps returning the
+   *  pre-write snapshot, and the digit-ui's localStorage cache will be
+   *  populated from stale data on next refresh. */
+  async cacheBust(): Promise<void> {
+    await apiClient.post(ENDPOINTS.LOCALIZATION_CACHE_BUST, {
+      RequestInfo: apiClient.buildRequestInfo(),
+    });
+  },
+
+  // ============================================
   // Helper Methods for Different Entity Types
   // ============================================
 

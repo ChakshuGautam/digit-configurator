@@ -3,6 +3,7 @@ import { DigitList, DigitDatagrid } from '@/admin';
 import type { DigitColumn } from '@/admin';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAvailableLocales, type LocaleOption } from '@/hooks/useAvailableLocales';
+import { LocalizationToolbar } from './LocalizationToolbar';
 
 const labelFor = (code: string, locales: LocaleOption[]) =>
   locales.find((o) => o.value === code)?.label ?? code;
@@ -87,7 +88,12 @@ function PivotDatagrid() {
 
 export function LocalizationList() {
   return (
-    <DigitList title="app.resources.localization" hasCreate sort={{ field: 'code', order: 'ASC' }}>
+    <DigitList
+      title="app.resources.localization"
+      hasCreate
+      sort={{ field: 'code', order: 'ASC' }}
+      actions={<LocalizationToolbar />}
+    >
       <LocaleSelector />
       <PivotDatagrid />
     </DigitList>

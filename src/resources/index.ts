@@ -31,6 +31,7 @@ export { LocalizationList } from './localization/LocalizationList';
 export { LocalizationShow } from './localization/LocalizationShow';
 export { LocalizationEdit } from './localization/LocalizationEdit';
 export { LocalizationCreate } from './localization/LocalizationCreate';
+export { LocalizationBulkImport } from './localization/LocalizationBulkImport';
 export { AdvancedPage } from './advanced/AdvancedPage';
 export { UserList } from './users/UserList';
 export { UserShow } from './users/UserShow';
