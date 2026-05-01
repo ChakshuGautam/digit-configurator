@@ -4,6 +4,7 @@ import { RegexInput } from './RegexInput';
 import { ChipArrayInput } from './ChipArrayInput';
 import { DurationMsInput } from './DurationMsInput';
 import { BooleanInput } from './BooleanInput';
+import { LocaleListInput } from './LocaleListInput';
 import type { FieldSpec } from '../schemaDescriptors/types';
 
 interface WidgetDispatchProps {
@@ -28,6 +29,8 @@ export function WidgetForFieldSpec({ spec, source }: WidgetDispatchProps) {
       return <ChipArrayInput {...shared} help={spec.help} />;
     case 'duration-ms':
       return <DurationMsInput {...shared} help={spec.help} min={spec.min} max={spec.max} />;
+    case 'locale-list':
+      return <LocaleListInput {...shared} help={spec.help} />;
     case 'boolean':
       return <BooleanInput {...shared} help={spec.help} />;
     case 'integer':
@@ -42,4 +45,4 @@ export function WidgetForFieldSpec({ spec, source }: WidgetDispatchProps) {
   }
 }
 
-export { ColorInput, RegexInput, ChipArrayInput, DurationMsInput, BooleanInput };
+export { ColorInput, RegexInput, ChipArrayInput, DurationMsInput, BooleanInput, LocaleListInput };
