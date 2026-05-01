@@ -18,7 +18,7 @@ import {
   EmployeeList, EmployeeShow, EmployeeEdit, EmployeeCreate, EmployeeBulkImport,
   ComplaintList, ComplaintShow, ComplaintEdit, ComplaintCreate,
   BoundaryList, BoundaryShow, BoundaryEdit, BoundaryCreate,
-  LocalizationList, LocalizationShow, LocalizationEdit, LocalizationCreate,
+  LocalizationList, LocalizationShow, LocalizationEdit, LocalizationCreate, LocalizationBulkImport,
   UserList, UserShow, UserEdit, UserCreate,
   AccessRoleList, AccessRoleShow,
   AccessActionList, AccessActionShow,
@@ -142,6 +142,7 @@ function ManagementAdmin() {
           <Route path="/employees/bulk" element={<EmployeeBulkImport />} />
           <Route path="/departments/bulk" element={<DepartmentBulkImport />} />
           <Route path="/designations/bulk" element={<DesignationBulkImport />} />
+          <Route path="/localization/bulk" element={<LocalizationBulkImport />} />
         </CustomRoutes>
       </CoreAdminUI>
     </CoreAdminContext>

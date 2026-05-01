@@ -34,6 +34,10 @@ export const ENDPOINTS = {
   // Localization
   LOCALIZATION_SEARCH: '/localization/messages/v1/_search',
   LOCALIZATION_UPSERT: '/localization/messages/v1/_upsert',
+  // Localization service caches per-tenant in memory; without this call
+  // after a write, `_search` (and the digit-ui's localStorage cache) keep
+  // returning the pre-write snapshot until restart.
+  LOCALIZATION_CACHE_BUST: '/localization/messages/cache-bust',
 
   // Filestore
   FILESTORE_UPLOAD: '/filestore/v1/files',
