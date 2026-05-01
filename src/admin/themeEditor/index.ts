@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 import { ThemeConfigEditor } from './ThemeConfigEditor';
+import { StateInfoEditor } from './StateInfoEditor';
 
 /**
  * Registry of custom editors keyed by the `customEditor` field on
@@ -12,6 +13,13 @@ import { ThemeConfigEditor } from './ThemeConfigEditor';
  */
 export const customEditors: Record<string, ComponentType> = {
   'theme-config': ThemeConfigEditor,
+  // StateInfo's languages array is the only knob that controls the locales
+  // available across the configurator AND the digit-ui language switcher.
+  // The descriptor + LocaleListInput render fine through the generic form,
+  // but the schema-driven save path silently swallows the submit on this
+  // resource (filed separately). The custom editor calls mdmsUpdate
+  // directly so save is reliable.
+  'state-info': StateInfoEditor,
 };
 
-export { ThemeConfigEditor };
+export { ThemeConfigEditor, StateInfoEditor };

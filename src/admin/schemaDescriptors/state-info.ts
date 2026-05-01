@@ -20,6 +20,10 @@ import type { SchemaDescriptor } from './types';
  */
 export const stateInfoDescriptor: SchemaDescriptor = {
   schema: 'common-masters.StateInfo',
+  // The schema-driven form path silently swallows submits on this resource.
+  // Until that's root-caused, mount the dedicated editor so adding a locale
+  // actually persists. Save is the load-bearing operation here.
+  customEditor: 'state-info',
   groups: [
     { title: 'Identity', fields: ['code', 'name'] },
     { title: 'Languages', fields: ['languages'] },
