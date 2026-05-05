@@ -312,14 +312,74 @@ export default function PgrDashboard() {
     };
   }, [stats]);
 
+  // Header (title + week picker + Download + filter chips) renders in every
+  // state — loading, error, empty, and success — so a filter that yields no
+  // results never strands the user without the chips that toggled it (CCRS#533).
+  const header = (
+    <div className="space-y-3">
+      <div className="flex items-start justify-between flex-wrap gap-2">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold font-condensed text-foreground">
+            PGR Dashboard
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {isLoading
+              ? 'Loading complaint data…'
+              : stats
+                ? <>Public Grievance Redressal &mdash; {stats.total} complaint{stats.total !== 1 ? 's' : ''}</>
+                : 'Public Grievance Redressal'}
+          </p>
+          {reportError && (
+            <p className="text-sm text-destructive mt-1">{reportError}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="week"
+            value={selectedWeek}
+            onChange={(e) => setSelectedWeek(e.target.value)}
+            className="border rounded px-2 py-1 text-sm bg-background text-foreground"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => generate(weekStringToDate(selectedWeek))}
+            disabled={isGenerating}
+          >
+            {isGenerating ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-1" />
+            ) : (
+              <Download className="w-4 h-4 mr-1" />
+            )}
+            {isGenerating ? 'Generating...' : 'Download Report'}
+          </Button>
+        </div>
+      </div>
+      {/* Date filter presets */}
+      <div className="flex items-center gap-1 flex-wrap">
+        {DATE_PRESETS.map((p) => (
+          <button
+            key={p.value}
+            onClick={() => setDatePreset(p.value)}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+              datePreset === p.value
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+        {isLoading && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground ml-2" />}
+      </div>
+    </div>
+  );
+
   // Loading skeleton
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold font-condensed text-foreground">PGR Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-1">Loading complaint data...</p>
-        </div>
+        {header}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
             <DigitCard key={i} className="!mb-0 !max-w-none">
@@ -340,9 +400,7 @@ export default function PgrDashboard() {
   if (error) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold font-condensed text-foreground">PGR Dashboard</h1>
-        </div>
+        {header}
         <DigitCard className="!mb-0 !max-w-none">
           <p className="text-destructive">Failed to load complaint data. Please try again later.</p>
         </DigitCard>
@@ -354,12 +412,11 @@ export default function PgrDashboard() {
   if (!stats) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold font-condensed text-foreground">PGR Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-1">Public Grievance Redressal</p>
-        </div>
+        {header}
         <DigitCard className="!mb-0 !max-w-none">
-          <p className="text-muted-foreground">No complaints found. File a complaint to see dashboard data.</p>
+          <p className="text-muted-foreground">
+            No complaints found for the selected period. Try a different filter or file a complaint to see dashboard data.
+          </p>
         </DigitCard>
       </div>
     );
@@ -367,60 +424,7 @@ export default function PgrDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Title + Filters + Report Download */}
-      <div className="space-y-3">
-        <div className="flex items-start justify-between flex-wrap gap-2">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold font-condensed text-foreground">
-              PGR Dashboard
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Public Grievance Redressal &mdash; {stats.total} complaint{stats.total !== 1 ? 's' : ''}
-            </p>
-            {reportError && (
-              <p className="text-sm text-destructive mt-1">{reportError}</p>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="week"
-              value={selectedWeek}
-              onChange={(e) => setSelectedWeek(e.target.value)}
-              className="border rounded px-2 py-1 text-sm bg-background text-foreground"
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => generate(weekStringToDate(selectedWeek))}
-              disabled={isGenerating}
-            >
-              {isGenerating ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-1" />
-              ) : (
-                <Download className="w-4 h-4 mr-1" />
-              )}
-              {isGenerating ? 'Generating...' : 'Download Report'}
-            </Button>
-          </div>
-        </div>
-        {/* Date filter presets */}
-        <div className="flex items-center gap-1 flex-wrap">
-          {DATE_PRESETS.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => setDatePreset(p.value)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                datePreset === p.value
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-          {isLoading && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground ml-2" />}
-        </div>
-      </div>
+      {header}
 
       {/* Row 1: Overview card + Cumulative line chart */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
