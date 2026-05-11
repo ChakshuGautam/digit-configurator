@@ -133,6 +133,10 @@ export default function Phase2Page() {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    // Reset so the same filename re-fires onChange on the next pick. Without
+    // this, after a failed validation the user fixes the workbook + re-picks
+    // the same file and nothing happens — the browser de-dupes the change.
+    e.target.value = '';
     if (!file) return;
 
     setError(null);
@@ -291,6 +295,19 @@ export default function Phase2Page() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Hidden file picker. Lives at page root so the "Re-upload Fixed File"
+          button in the `verify` step can trigger it — the dropzone (and the
+          original input) only exist while step === 'template', so on `verify`
+          the previous getElementById call would return null and silently
+          no-op (CCRS#563). */}
+      <input
+        id="boundary-file-upload"
+        type="file"
+        accept=".xlsx,.xls"
+        onChange={handleFileUpload}
+        className="hidden"
+        disabled={loading}
+      />
       {/* Header - DIGIT style */}
       <div className="flex items-center gap-2 sm:gap-3">
         <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 border-2 border-primary rounded flex items-center justify-center flex-shrink-0">
@@ -568,14 +585,6 @@ export default function Phase2Page() {
                 <p className="text-xs text-muted-foreground">or click to browse</p>
               </>
             )}
-            <input
-              id="boundary-file-upload"
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleFileUpload}
-              className="hidden"
-              disabled={loading}
-            />
           </div>
 
           <Alert variant="warning" className="mb-4 sm:mb-6">
