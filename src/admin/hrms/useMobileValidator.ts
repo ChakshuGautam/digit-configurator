@@ -33,15 +33,26 @@ function parseRules(record: Record<string, unknown> | undefined): MobileRules {
   const mdmsMin = typeof raw.minLength === 'number' ? raw.minLength : FALLBACK.minLength;
   const minLength = Math.max(mdmsMin, HRMS_MIN_LENGTH);
   const clamped = minLength > mdmsMin;
+  // When MDMS allows shorter input than HRMS accepts, the MDMS pattern is
+  // sized for the shorter form (e.g. Kenya `^[17][0-9]{8}$` = 9 chars) and
+  // its maxLength matches. If we only clamp minLength, the validator ends
+  // up requiring length ≥ 10 AND ≤ 9 AND matching a 9-char regex — every
+  // input fails. Swap pattern + maxLength to FALLBACK alongside the message
+  // so the form actually accepts what HRMS will accept downstream.
+  // Closes the BLOCKER on egovernments/CCRS#484.
   return {
-    pattern: typeof raw.pattern === 'string' ? raw.pattern : FALLBACK.pattern,
+    pattern: clamped
+      ? FALLBACK.pattern
+      : typeof raw.pattern === 'string'
+      ? raw.pattern
+      : FALLBACK.pattern,
     minLength,
-    maxLength:
-      typeof raw.maxLength === 'number' ? raw.maxLength : FALLBACK.maxLength,
+    maxLength: clamped
+      ? FALLBACK.maxLength
+      : typeof raw.maxLength === 'number'
+      ? raw.maxLength
+      : FALLBACK.maxLength,
     prefix: typeof raw.prefix === 'string' ? raw.prefix : FALLBACK.prefix,
-    // HRMS rejects 9-digit input even if MDMS allows it, so when the MDMS
-    // rule was looser than HRMS's 10-digit floor we replace the message
-    // rather than mislead operators with MDMS's "9 or 10 digits" phrasing.
     errorMessage: clamped
       ? FALLBACK.errorMessage
       : typeof raw.errorMessage === 'string' && raw.errorMessage
