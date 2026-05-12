@@ -91,20 +91,18 @@ const isDuplicateError = (msg: string): boolean =>
 
 // --- Step 0: detection ---------------------------------------------------
 
-/** True iff the state root has zero schemas registered. If so, wizard must bootstrap. */
+/** True iff the state root has zero schemas registered. If so, wizard must bootstrap.
+ *  Transport errors propagate — "no response from MDMS" is not the same signal as
+ *  "MDMS confirmed zero schemas". Swallowing the former would trigger 100+ failing
+ *  bootstrap calls against a service that's already unreachable and surface the
+ *  wrong error to the user. */
 export async function stateNeedsBootstrap(stateRoot: string): Promise<boolean> {
-  try {
-    const response = await apiClient.post(ENDPOINTS.MDMS_SCHEMA_SEARCH, {
-      RequestInfo: apiClient.buildRequestInfo(),
-      SchemaDefCriteria: { tenantId: stateRoot, limit: 1 },
-    });
-    const schemas = (response.SchemaDefinitions || []) as SchemaDefinition[];
-    return schemas.length === 0;
-  } catch {
-    // Treat any error as "needs bootstrap" — better to over-attempt than under-attempt;
-    // duplicate handling makes re-running idempotent anyway.
-    return true;
-  }
+  const response = await apiClient.post(ENDPOINTS.MDMS_SCHEMA_SEARCH, {
+    RequestInfo: apiClient.buildRequestInfo(),
+    SchemaDefCriteria: { tenantId: stateRoot, limit: 1 },
+  });
+  const schemas = (response.SchemaDefinitions || []) as SchemaDefinition[];
+  return schemas.length === 0;
 }
 
 // --- Step 1: schema clone ------------------------------------------------
@@ -178,58 +176,92 @@ async function provisionAdmin(target: string): Promise<{ uuid: string } | null> 
 
 // --- Step 5: workflow PGR copy ------------------------------------------
 
+interface WorkflowState {
+  uuid?: string;
+  state?: string;
+  applicationStatus?: string;
+  docUploadRequired?: boolean;
+  isStartState?: boolean;
+  isTerminateState?: boolean;
+  isStateUpdatable?: boolean;
+  actions?: WorkflowAction[];
+}
+
+interface WorkflowAction {
+  uuid?: string;
+  action?: string;
+  nextState?: string; // UUID from source, must resolve to state code before re-send
+  roles?: string[];
+  active?: boolean;
+}
+
 interface WorkflowBusinessService {
   tenantId: string;
   businessService: string;
   business: string;
   businessServiceSla: number;
-  states: unknown[];
+  states: WorkflowState[];
 }
 
 async function workflowCopyPGR(source: string, target: string): Promise<string[]> {
-  // Source workflow lives at a city tenant (typically pg.citya). Fall back to searching
-  // at the source state root if the city-specific search returns nothing.
-  const searchAtCity = `${source}.citya`;
+  // Most stacks register the PGR workflow at the state root, not at a city. naipepea
+  // has it at `ke`; bomet has it at `pg` (the bomet state root in their config). Only
+  // personal-install's default pg.citya/pg.cityb sample data registers at the city.
+  // Try state-root first, fall back to <source>.citya for that one case.
   let response = await apiClient.post(
-    `${ENDPOINTS.WORKFLOW_BS_SEARCH}?tenantId=${searchAtCity}&businessServices=PGR`,
+    `${ENDPOINTS.WORKFLOW_BS_SEARCH}?tenantId=${source}&businessServices=PGR`,
     { RequestInfo: apiClient.buildRequestInfo() }
   );
   let services = (response.BusinessServices || []) as WorkflowBusinessService[];
   if (services.length === 0) {
     response = await apiClient.post(
-      `${ENDPOINTS.WORKFLOW_BS_SEARCH}?tenantId=${source}&businessServices=PGR`,
+      `${ENDPOINTS.WORKFLOW_BS_SEARCH}?tenantId=${source}.citya&businessServices=PGR`,
       { RequestInfo: apiClient.buildRequestInfo() }
     );
     services = (response.BusinessServices || []) as WorkflowBusinessService[];
   }
   if (services.length === 0) return [];
 
-  // Strip server-assigned fields, rebind to target tenant
-  const cleaned = services.map((svc) => ({
-    ...svc,
-    tenantId: target,
-    states: stripIds(svc.states),
-  }));
+  // Rebind each service to the target tenant. Critical detail: source states
+  // reference each other via UUID in `actions[].nextState`. The new tenant's
+  // states get fresh UUIDs on insert, so source UUID references would dangle
+  // and the first state transition would crash with NPE on `getResultantState`.
+  // Build a UUID→state-code map from source, then rewrite each action's
+  // nextState as the state code (a name like "PENDINGFORASSIGNMENT"); the
+  // workflow-v2 create resolves the code to the new UUID server-side.
+  const cleaned = services.map((svc) => {
+    const uuidToCode = new Map<string, string>();
+    for (const s of svc.states) {
+      if (s.uuid && s.state) uuidToCode.set(s.uuid, s.state);
+    }
+    const cleanStates: WorkflowState[] = svc.states.map((s) => ({
+      state: s.state,
+      applicationStatus: s.applicationStatus,
+      docUploadRequired: s.docUploadRequired,
+      isStartState: s.isStartState,
+      isTerminateState: s.isTerminateState,
+      isStateUpdatable: s.isStateUpdatable,
+      actions: (s.actions || []).map((a) => ({
+        action: a.action,
+        nextState: a.nextState ? uuidToCode.get(a.nextState) ?? a.nextState : undefined,
+        roles: a.roles,
+        active: a.active,
+      })),
+    }));
+    return {
+      tenantId: target,
+      businessService: svc.businessService,
+      business: svc.business,
+      businessServiceSla: svc.businessServiceSla,
+      states: cleanStates,
+    };
+  });
 
   await apiClient.post(`${ENDPOINTS.WORKFLOW_BS_CREATE}?tenantId=${target}`, {
     RequestInfo: apiClient.buildRequestInfo(),
     BusinessServices: cleaned,
   });
   return cleaned.map((s) => s.businessService);
-}
-
-// Recursively strip uuid/auditDetails/currentState-by-uuid so workflow create accepts the payload
-function stripIds(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(stripIds);
-  if (value && typeof value === 'object') {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if (k === 'uuid' || k === 'auditDetails' || k === 'businessServiceId' || k === 'currentState') continue;
-      out[k] = stripIds(v);
-    }
-    return out;
-  }
-  return value;
 }
 
 // --- Top-level orchestration --------------------------------------------
@@ -250,6 +282,18 @@ export async function bootstrapStateRoot(
 
   // Step 1: schemas
   const sourceSchemas = await searchSchemas(source);
+  if (sourceSchemas.length === 0) {
+    // Bootstrap from an empty source would silently succeed at the wizard level
+    // (no errors per-schema because there are no schemas to copy) but leave the
+    // target tenant with zero schemas — every subsequent Phase 3-4 write would
+    // fail with SCHEMA_DEFINITION_NOT_FOUND_ERR, the same failure mode this
+    // bootstrap exists to prevent. Fail fast with a message the operator can act on.
+    throw new Error(
+      `Bootstrap source tenant '${source}' has no schemas registered. ` +
+      `Pick a tenant that has been onboarded (e.g. 'pg' on personal-install, ` +
+      `'ke' on naipepea) via the source option.`
+    );
+  }
   onProgress({ step: 'schemas', current: 0, total: sourceSchemas.length });
   for (let i = 0; i < sourceSchemas.length; i++) {
     const schema = sourceSchemas[i];
