@@ -5,7 +5,6 @@ import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { BulkImportPanel, triggerDownload, type BulkRow, type BulkColumn } from '@/admin/bulk/BulkImportPanel';
 import { parseEmployeeExcel } from '@/utils/excelParser';
-import { normalizeMobileForHrms } from '@/admin/hrms/useMobileValidator';
 import { hrmsService, mdmsService, boundaryService } from '@/api';
 import type {
   EmployeeExcelRow,
@@ -198,21 +197,17 @@ export function EmployeeBulkImport() {
         }
       }
       if (row.mobileNumber) {
-        // Match the form-side validator's behaviour: when MDMS says the
-        // tenant accepts a shorter form than HRMS (`@Pattern("^[0-9]{10}$")`),
-        // accept both 9- and 10-digit Kenyan forms here and rely on
-        // `normalizeMobileForHrms` to pad to 10 at submission. Closes the
+        // MDMS is the source of truth — egov-hrms's User.java no longer
+        // carries its own `@Pattern("^[0-9]{10}$")`, validation is delegated
+        // to MDMS via egov-user's MobileNumberValidator. Trust the rule
+        // returned by `mdmsService.getMobileValidation` exactly. Closes the
         // bulk-import side of the CCRS#484/#540 BLOCKER.
-        const mdmsMin = mobileRules?.minLength ?? 10;
-        const mdmsMax = mobileRules?.maxLength ?? 10;
-        const needsBothForms = mdmsMax < 10;
-        const effMin = mdmsMin;
-        const effMax = needsBothForms ? 10 : mdmsMax;
-        const effPattern = needsBothForms ? /^0?[17][0-9]{8}$/ : compiled;
-        const effMsg = mobileRules?.errorMessage ?? 'Enter a 10-digit Kenyan mobile starting with 07 or 01 (e.g. 0712345678)';
+        const minLen = mobileRules?.minLength ?? 9;
+        const maxLen = mobileRules?.maxLength ?? 9;
+        const msg = mobileRules?.errorMessage ?? 'Please enter a valid Kenyan mobile number (9 digits starting with 1 or 7)';
         const len = row.mobileNumber.length;
-        if (len < effMin || len > effMax || (effPattern && !effPattern.test(row.mobileNumber))) {
-          errors.push(effMsg);
+        if (len < minLen || len > maxLen || (compiled && !compiled.test(row.mobileNumber))) {
+          errors.push(msg);
         }
       }
       if (!row.dob || !/^\d{4}-\d{2}-\d{2}$/.test(row.dob)) {
@@ -256,7 +251,7 @@ export function EmployeeBulkImport() {
         code: row.employeeCode || hrmsService.generateEmployeeCode('EMP', index + 1),
         name: row.name,
         userName: (row.userName && row.userName.trim()) || hrmsService.generateUsername(row.name),
-        mobileNumber: normalizeMobileForHrms(row.mobileNumber),
+        mobileNumber: row.mobileNumber,
         emailId: row.emailId,
         gender: row.gender,
         dob: new Date(row.dob).getTime(),
