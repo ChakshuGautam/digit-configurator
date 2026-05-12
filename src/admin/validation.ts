@@ -103,6 +103,37 @@ export const slaHours = composeValidators(
   maxValue(8760),
 );
 
+/**
+ * Date strictly in the past — used for Date of Birth where today's date
+ * is nonsensical. Accepts ISO strings from `<input type="date">` (e.g.
+ * "2026-05-12"), epoch numbers, and Date instances. Empty values pass
+ * (compose with `required` to also require a value).
+ *
+ * Closes the "DOB accepts today" point on egovernments/CCRS#484.
+ */
+export const dateInPast = (value: unknown) => {
+  if (value === undefined || value === null || value === '') return undefined;
+  let ms: number;
+  if (typeof value === 'number') {
+    ms = value;
+  } else if (value instanceof Date) {
+    ms = value.getTime();
+  } else if (typeof value === 'string') {
+    ms = new Date(value).getTime();
+  } else {
+    return 'Enter a valid date';
+  }
+  if (Number.isNaN(ms)) return 'Enter a valid date';
+  const now = new Date();
+  // Strict comparison at day granularity — today's midnight onward is rejected.
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if (ms >= todayStart) return 'Date must be in the past';
+  return undefined;
+};
+
+/** Date of Birth — required and strictly before today. */
+export const dobRequired = composeValidators(required, dateInPast);
+
 // Re-export composeValidators for custom combos
 export { composeValidators };
 
@@ -123,3 +154,4 @@ flagRequired(emailRequired);
 flagRequired(codeRequired);
 flagRequired(positiveInt);
 flagRequired(slaHours);
+flagRequired(dobRequired);
