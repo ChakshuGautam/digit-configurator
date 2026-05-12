@@ -119,7 +119,20 @@ export const dateInPast = (value: unknown) => {
   } else if (value instanceof Date) {
     ms = value.getTime();
   } else if (typeof value === 'string') {
-    ms = new Date(value).getTime();
+    // `<input type="date">` ships "YYYY-MM-DD". `new Date("YYYY-MM-DD")` parses
+    // as UTC midnight, while our comparison anchor (`todayStart` below) is
+    // local midnight — in negative-UTC-offset tenants that mismatch lets
+    // today's date sneak through as "before today". Parse the date-only form
+    // as local-midnight so the comparison stays apples-to-apples regardless
+    // of TZ. Fall back to native parsing for fully-qualified strings
+    // (timestamps with a Z / ±HH:MM offset, RFC2822, etc.).
+    const isoDateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (isoDateOnly) {
+      const [, y, m, d] = isoDateOnly;
+      ms = new Date(Number(y), Number(m) - 1, Number(d)).getTime();
+    } else {
+      ms = new Date(value).getTime();
+    }
   } else {
     return 'Enter a valid date';
   }
