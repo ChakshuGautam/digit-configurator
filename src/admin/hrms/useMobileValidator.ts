@@ -26,38 +26,51 @@ const FALLBACK: MobileRules = {
     'Enter a 10-digit Kenyan mobile starting with 07 or 01 (e.g. 0712345678)',
 };
 
+// Pad a 9-digit Kenyan mobile (`712345678`) with a leading `0` so it becomes
+// the 10-digit form HRMS's @Pattern("^[0-9]{10}$") on User.java will accept.
+// Both forms are valid Kenyan numbers — the leading-0 form is the local
+// presentation convention. Operators copy-paste from contact apps in either
+// form; the validator accepts both via FALLBACK's `^0?[17][0-9]{8}$`, but
+// HRMS only accepts the padded 10-digit form. Normalising here lets the rest
+// of the configurator stay agnostic.
+//
+// Returns the input unchanged when it doesn't match the 9-digit Kenya shape,
+// so non-Kenya inputs and already-padded ones pass through cleanly. The
+// MDMS-driven validator decides whether the result is valid — this helper
+// only handles the format adapter step.
+export function normalizeMobileForHrms(raw: string | null | undefined): string {
+  if (raw == null) return '';
+  const s = String(raw).trim();
+  if (/^[17][0-9]{8}$/.test(s)) return '0' + s;
+  return s;
+}
+
 function parseRules(record: Record<string, unknown> | undefined): MobileRules {
   if (!record) return FALLBACK;
   const raw = record.rules as Record<string, unknown> | undefined;
   if (!raw) return FALLBACK;
   const mdmsMin = typeof raw.minLength === 'number' ? raw.minLength : FALLBACK.minLength;
-  const minLength = Math.max(mdmsMin, HRMS_MIN_LENGTH);
-  const clamped = minLength > mdmsMin;
-  // When MDMS allows shorter input than HRMS accepts, the MDMS pattern is
-  // sized for the shorter form (e.g. Kenya `^[17][0-9]{8}$` = 9 chars) and
-  // its maxLength matches. If we only clamp minLength, the validator ends
-  // up requiring length ≥ 10 AND ≤ 9 AND matching a 9-char regex — every
-  // input fails. Swap pattern + maxLength to FALLBACK alongside the message
-  // so the form actually accepts what HRMS will accept downstream.
-  // Closes the BLOCKER on egovernments/CCRS#484.
+  const mdmsMax = typeof raw.maxLength === 'number' ? raw.maxLength : FALLBACK.maxLength;
+  // Tenant rule allows a shorter form than HRMS's `@Pattern("^[0-9]{10}$")`
+  // accepts (e.g. Kenya MDMS says 9 digits, HRMS needs 10). Rather than
+  // refusing the MDMS-valid form in the UI, accept both 9- and 10-digit
+  // Kenyan formats here and let `normalizeMobileForHrms` pad to 10 at
+  // submission time. The validator stays MDMS-aligned, the wire stays
+  // HRMS-aligned. Closes the BLOCKER on egovernments/CCRS#484.
+  const needsBothForms = mdmsMax < HRMS_MIN_LENGTH;
   return {
-    pattern: clamped
+    pattern: needsBothForms
       ? FALLBACK.pattern
       : typeof raw.pattern === 'string'
       ? raw.pattern
       : FALLBACK.pattern,
-    minLength,
-    maxLength: clamped
-      ? FALLBACK.maxLength
-      : typeof raw.maxLength === 'number'
-      ? raw.maxLength
-      : FALLBACK.maxLength,
+    minLength: mdmsMin,
+    maxLength: needsBothForms ? HRMS_MIN_LENGTH : mdmsMax,
     prefix: typeof raw.prefix === 'string' ? raw.prefix : FALLBACK.prefix,
-    errorMessage: clamped
-      ? FALLBACK.errorMessage
-      : typeof raw.errorMessage === 'string' && raw.errorMessage
-      ? raw.errorMessage
-      : FALLBACK.errorMessage,
+    errorMessage:
+      typeof raw.errorMessage === 'string' && raw.errorMessage
+        ? raw.errorMessage
+        : FALLBACK.errorMessage,
   };
 }
 

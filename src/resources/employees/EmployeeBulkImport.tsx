@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { BulkImportPanel, triggerDownload, type BulkRow, type BulkColumn } from '@/admin/bulk/BulkImportPanel';
 import { parseEmployeeExcel } from '@/utils/excelParser';
+import { normalizeMobileForHrms } from '@/admin/hrms/useMobileValidator';
 import { hrmsService, mdmsService, boundaryService } from '@/api';
 import type {
   EmployeeExcelRow,
@@ -197,11 +198,21 @@ export function EmployeeBulkImport() {
         }
       }
       if (row.mobileNumber) {
+        // Match the form-side validator's behaviour: when MDMS says the
+        // tenant accepts a shorter form than HRMS (`@Pattern("^[0-9]{10}$")`),
+        // accept both 9- and 10-digit Kenyan forms here and rely on
+        // `normalizeMobileForHrms` to pad to 10 at submission. Closes the
+        // bulk-import side of the CCRS#484/#540 BLOCKER.
+        const mdmsMin = mobileRules?.minLength ?? 10;
+        const mdmsMax = mobileRules?.maxLength ?? 10;
+        const needsBothForms = mdmsMax < 10;
+        const effMin = mdmsMin;
+        const effMax = needsBothForms ? 10 : mdmsMax;
+        const effPattern = needsBothForms ? /^0?[17][0-9]{8}$/ : compiled;
+        const effMsg = mobileRules?.errorMessage ?? 'Enter a 10-digit Kenyan mobile starting with 07 or 01 (e.g. 0712345678)';
         const len = row.mobileNumber.length;
-        const effMin = Math.max(mobileRules?.minLength ?? 10, 10);
-        const effMax = mobileRules?.maxLength ?? 10;
-        if (len < effMin || len > effMax || (compiled && !compiled.test(row.mobileNumber))) {
-          errors.push(mobileRules?.errorMessage ?? 'Mobile number must be 10 digits starting with 07 or 01');
+        if (len < effMin || len > effMax || (effPattern && !effPattern.test(row.mobileNumber))) {
+          errors.push(effMsg);
         }
       }
       if (!row.dob || !/^\d{4}-\d{2}-\d{2}$/.test(row.dob)) {
@@ -245,7 +256,7 @@ export function EmployeeBulkImport() {
         code: row.employeeCode || hrmsService.generateEmployeeCode('EMP', index + 1),
         name: row.name,
         userName: (row.userName && row.userName.trim()) || hrmsService.generateUsername(row.name),
-        mobileNumber: row.mobileNumber,
+        mobileNumber: normalizeMobileForHrms(row.mobileNumber),
         emailId: row.emailId,
         gender: row.gender,
         dob: new Date(row.dob).getTime(),

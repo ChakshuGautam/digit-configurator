@@ -1,7 +1,7 @@
 import { DigitCreate, DigitFormCodeInput, DigitFormInput, DigitFormSelect, v } from '@/admin';
 import { FieldSection } from '@/admin/fields';
 import { DEFAULT_PASSWORD } from '@/api/config';
-import { useMobileValidator } from '@/admin/hrms/useMobileValidator';
+import { normalizeMobileForHrms, useMobileValidator } from '@/admin/hrms/useMobileValidator';
 import { useApp } from '../../App';
 import { RolesEditor } from './RolesEditor';
 import { JurisdictionEditor } from './JurisdictionEditor';
@@ -77,6 +77,12 @@ export function EmployeeCreate() {
       type: 'EMPLOYEE',
       active: true,
       password: typeof userInput.password === 'string' && userInput.password ? userInput.password : DEFAULT_PASSWORD,
+      // HRMS's User.java still carries @Pattern("^[0-9]{10}$") on 2.9-LTS,
+      // so a 9-digit Kenya input the form accepts (`712345678`) gets 400'd
+      // downstream. Pad to the leading-0 form before submission.
+      mobileNumber: typeof userInput.mobileNumber === 'string'
+        ? normalizeMobileForHrms(userInput.mobileNumber)
+        : userInput.mobileNumber,
       dob: toEpochMs(userInput.dob),
     };
 
