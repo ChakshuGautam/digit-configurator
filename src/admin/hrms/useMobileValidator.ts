@@ -80,7 +80,7 @@ export function useMobileValidator(): UseMobileValidatorResult {
     } catch {
       compiled = null;
     }
-    return (value: unknown) => {
+    const fn: Validator = (value: unknown) => {
       if (value === undefined || value === null || value === '') {
         return 'Required';
       }
@@ -93,6 +93,14 @@ export function useMobileValidator(): UseMobileValidatorResult {
       }
       return undefined;
     };
+    // ra-core `useInput` exposes `isRequired` based on a flag on the
+    // validator function — without it the field gets no "*" mark in
+    // DigitFormInput. The mobile validator is built dynamically (rules
+    // come from MDMS) so we can't compose with `required` upfront via
+    // validation.ts's flagRequired; tag the dynamic result here instead.
+    // Closes the missing-asterisk point on egovernments/CCRS#484.
+    (fn as unknown as { isRequired?: boolean }).isRequired = true;
+    return fn;
   }, [rules]);
 
   return { rules, validator, isLoading };

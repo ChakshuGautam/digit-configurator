@@ -121,14 +121,14 @@ export function EmployeeCreate() {
             help={mobileRules.errorMessage}
           />
           <DigitFormInput source="user.emailId" label="Email" type="email" validate={v.emailOptional} />
-          <DigitFormInput source="user.dob" label="Date of Birth" type="date" validate={v.required} />
+          <DigitFormInput source="user.dob" label="Date of Birth" type="date" validate={v.dobRequired} />
           <DigitFormSelect
             source="user.gender"
             label="Gender"
             choices={GENDER_CHOICES}
             placeholder="Select gender..."
           />
-          <DigitFormInput source="dateOfAppointment" label="Date of Appointment" type="date" />
+          <DigitFormInput source="dateOfAppointment" label="Date of Appointment" type="date" validate={v.required} />
           <DigitFormSelect
             source="employeeStatus"
             label="Employee Status"

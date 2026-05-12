@@ -103,6 +103,50 @@ export const slaHours = composeValidators(
   maxValue(8760),
 );
 
+/**
+ * Date strictly in the past — used for Date of Birth where today's date
+ * is nonsensical. Accepts ISO strings from `<input type="date">` (e.g.
+ * "2026-05-12"), epoch numbers, and Date instances. Empty values pass
+ * (compose with `required` to also require a value).
+ *
+ * Closes the "DOB accepts today" point on egovernments/CCRS#484.
+ */
+export const dateInPast = (value: unknown) => {
+  if (value === undefined || value === null || value === '') return undefined;
+  let ms: number;
+  if (typeof value === 'number') {
+    ms = value;
+  } else if (value instanceof Date) {
+    ms = value.getTime();
+  } else if (typeof value === 'string') {
+    // `<input type="date">` ships "YYYY-MM-DD". `new Date("YYYY-MM-DD")` parses
+    // as UTC midnight, while our comparison anchor (`todayStart` below) is
+    // local midnight — in negative-UTC-offset tenants that mismatch lets
+    // today's date sneak through as "before today". Parse the date-only form
+    // as local-midnight so the comparison stays apples-to-apples regardless
+    // of TZ. Fall back to native parsing for fully-qualified strings
+    // (timestamps with a Z / ±HH:MM offset, RFC2822, etc.).
+    const isoDateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (isoDateOnly) {
+      const [, y, m, d] = isoDateOnly;
+      ms = new Date(Number(y), Number(m) - 1, Number(d)).getTime();
+    } else {
+      ms = new Date(value).getTime();
+    }
+  } else {
+    return 'Enter a valid date';
+  }
+  if (Number.isNaN(ms)) return 'Enter a valid date';
+  const now = new Date();
+  // Strict comparison at day granularity — today's midnight onward is rejected.
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if (ms >= todayStart) return 'Date must be in the past';
+  return undefined;
+};
+
+/** Date of Birth — required and strictly before today. */
+export const dobRequired = composeValidators(required, dateInPast);
+
 // Re-export composeValidators for custom combos
 export { composeValidators };
 
@@ -123,3 +167,4 @@ flagRequired(emailRequired);
 flagRequired(codeRequired);
 flagRequired(positiveInt);
 flagRequired(slaHours);
+flagRequired(dobRequired);
