@@ -16,6 +16,15 @@ export const ENDPOINTS = {
   // MDMS
   MDMS_SEARCH: '/mdms-v2/v2/_search',
   MDMS_CREATE: '/mdms-v2/v2/_create',
+  MDMS_SCHEMA_SEARCH: '/mdms-v2/schema/v1/_search',
+  MDMS_SCHEMA_CREATE: '/mdms-v2/schema/v1/_create',
+
+  // User (for tenant bootstrap)
+  USER_CREATE: '/user/users/_createnovalidate',
+
+  // Workflow (for tenant bootstrap — PGR state machine clone)
+  WORKFLOW_BS_SEARCH: '/egov-workflow-v2/egov-wf/businessservice/_search',
+  WORKFLOW_BS_CREATE: '/egov-workflow-v2/egov-wf/businessservice/_create',
 
   // Boundary
   BOUNDARY_SEARCH: '/boundary-service/boundary/_search',
