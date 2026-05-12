@@ -27,6 +27,7 @@ import { Banner } from '@/components/digit/Banner';
 import { parseExcelFile, parseTenantExcel } from '@/utils/excelParser';
 import * as XLSX from 'xlsx';
 import { mdmsService, localizationService, apiClient, ApiClientError } from '@/api';
+import { bootstrapStateRoot, stateNeedsBootstrap, type BootstrapProgress } from '@/api/services/tenantBootstrap';
 import type { TenantExcelRow, Tenant, ValidationResult } from '@/api/types';
 
 type Step = 'landing' | 'upload' | 'preview' | 'branding' | 'complete';
@@ -72,11 +73,16 @@ const BRANDING_FIELDS: ReadonlyArray<{
 export default function Phase1Page() {
   const { completePhase, addUndo, state, setTargetTenant } = useApp();
   const navigate = useNavigate();
-  const rootTenant = state.tenant;
   const [step, setStep] = useState<Step>('landing');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  // Bootstrap progress (only set when we detect a brand-new state root).
+  // The new tenant.tenants record will be written at parentState (derived from the
+  // tenant code), never at state.tenant — the latter is a localStorage value whose
+  // meaning is "whichever tenant the operator's chrome was last pointing at" and
+  // doesn't belong in any write decision.
+  const [bootstrapProgress, setBootstrapProgress] = useState<BootstrapProgress | null>(null);
 
   // Parsed data
   const [tenantData, setTenantData] = useState<TenantExcelRow | null>(null);
@@ -156,11 +162,32 @@ export default function Phase1Page() {
         },
       };
 
-      // Create tenant in MDMS
-      await mdmsService.createTenant(rootTenant, tenant);
+      // Derive the parent state from the new tenant code. "kd.test" -> "kd";
+      // "ke.testzone" -> "ke". For a single-segment code like "kd" the parent
+      // is the code itself (it's already a state root).
+      const parentState = tenant.code.includes('.') ? tenant.code.split('.')[0] : tenant.code;
 
-      // Create localization for tenant name
-      await localizationService.upsertMessages(rootTenant, 'en_IN',
+      // If the parent state has no schemas registered, bootstrap it: register
+      // the canonical schema set + essential master data + an ADMIN user. The
+      // wizard's subsequent Phase 2-4 writes target the new tenant and rely on
+      // schema inheritance from this parent, so bootstrap must complete first.
+      if (await stateNeedsBootstrap(parentState)) {
+        setBootstrapProgress({ step: 'schemas', current: 0, total: 1 });
+        await bootstrapStateRoot(parentState, {
+          source: 'pg',
+          onProgress: setBootstrapProgress,
+        });
+        setBootstrapProgress(null);
+      }
+
+      // Create the new tenant.tenants record at the parent state (which now
+      // definitely has the tenant.tenants schema, either pre-existing or just
+      // registered by bootstrap). This replaces the previous `state.tenant`
+      // target — that was a localStorage value, not a deliberate write target.
+      await mdmsService.createTenant(parentState, tenant);
+
+      // Create localization for tenant name, also at the parent state.
+      await localizationService.upsertMessages(parentState, 'en_IN',
         localizationService.buildTenantLocalizations(tenant.code, tenant.name, 'en_IN')
       );
 
@@ -586,12 +613,23 @@ export default function Phase1Page() {
             </AlertDescription>
           </Alert>
 
+          {bootstrapProgress && (
+            <Alert className="mt-4 border-primary/30 bg-primary/5">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <AlertDescription>
+                Bootstrapping new state root — {bootstrapProgress.step}{' '}
+                ({bootstrapProgress.current}/{bootstrapProgress.total})
+                {bootstrapProgress.detail ? `: ${bootstrapProgress.detail}` : ''}
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row justify-between gap-3 sm:gap-0">
             <Button variant="ghost" size="sm" onClick={() => setStep('upload')} className="text-muted-foreground hover:text-primary">
               ← Change File
             </Button>
             <SubmitBar
-              label={loading ? 'Uploading...' : 'Upload to DIGIT'}
+              label={loading ? (bootstrapProgress ? 'Bootstrapping…' : 'Uploading...') : 'Upload to DIGIT'}
               onSubmit={handleUploadToDigit}
               disabled={loading}
               icon={loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
