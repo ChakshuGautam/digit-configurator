@@ -14,7 +14,7 @@ import {
   DepartmentList, DepartmentShow, DepartmentEdit, DepartmentCreate, DepartmentBulkImport,
   DesignationList, DesignationShow, DesignationEdit, DesignationCreate, DesignationBulkImport,
   ComplaintTypeList, ComplaintTypeShow, ComplaintTypeEdit, ComplaintTypeCreate,
-  TenantList, TenantShow,
+  TenantList, TenantShow, TenantEdit,
   EmployeeList, EmployeeShow, EmployeeEdit, EmployeeCreate, EmployeeBulkImport,
   ComplaintList, ComplaintShow, ComplaintEdit, ComplaintCreate,
   BoundaryList, BoundaryShow, BoundaryEdit, BoundaryCreate,
@@ -111,7 +111,7 @@ function ManagementAdmin() {
     >
       <CoreAdminUI layout={DigitLayout} dashboard={DigitDashboard}>
         {/* Core entities with List/Show/Edit/Create */}
-        <Resource name="tenants" list={TenantList} show={TenantShow} />
+        <Resource name="tenants" list={TenantList} show={TenantShow} edit={TenantEdit} />
         <Resource name="departments" list={DepartmentList} show={DepartmentShow} edit={DepartmentEdit} create={DepartmentCreate} />
         <Resource name="designations" list={DesignationList} show={DesignationShow} edit={DesignationEdit} create={DesignationCreate} />
         <Resource name="complaint-types" list={ComplaintTypeList} show={ComplaintTypeShow} edit={ComplaintTypeEdit} create={ComplaintTypeCreate} />

@@ -14,6 +14,7 @@ export { ComplaintTypeEdit } from './complaint-types/ComplaintTypeEdit';
 export { ComplaintTypeCreate } from './complaint-types/ComplaintTypeCreate';
 export { TenantList } from './tenants/TenantList';
 export { TenantShow } from './tenants/TenantShow';
+export { TenantEdit } from './tenants/TenantEdit';
 export { EmployeeList } from './employees/EmployeeList';
 export { EmployeeShow } from './employees/EmployeeShow';
 export { EmployeeEdit } from './employees/EmployeeEdit';

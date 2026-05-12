@@ -7,6 +7,12 @@ function TenantDetail() {
   if (!record) return null;
 
   const city = record.city as Record<string, unknown> | undefined;
+  const dash = (val: unknown) => {
+    const s = typeof val === 'string' ? val.trim() : '';
+    return s
+      ? <Field>{s}</Field>
+      : <Field><span className="text-muted-foreground">—</span></Field>;
+  };
 
   return (
     <div className="space-y-3">
@@ -17,6 +23,22 @@ function TenantDetail() {
       <LabelFieldPair>
         <CardLabel>Name</CardLabel>
         <Field>{String(record.name ?? '')}</Field>
+      </LabelFieldPair>
+      <LabelFieldPair>
+        <CardLabel>Description</CardLabel>
+        {dash(record.description)}
+      </LabelFieldPair>
+      <LabelFieldPair>
+        <CardLabel>Helpline number</CardLabel>
+        {dash(record.contactNumber)}
+      </LabelFieldPair>
+      <LabelFieldPair>
+        <CardLabel>Email</CardLabel>
+        {dash(record.emailId)}
+      </LabelFieldPair>
+      <LabelFieldPair>
+        <CardLabel>Address</CardLabel>
+        {dash(record.address)}
       </LabelFieldPair>
       <LabelFieldPair>
         <CardLabel>City</CardLabel>
@@ -32,7 +54,7 @@ function TenantDetail() {
 
 export function TenantShow() {
   return (
-    <DigitShow title="Tenant Details">
+    <DigitShow title="Tenant Details" hasEdit>
       <TenantDetail />
     </DigitShow>
   );
