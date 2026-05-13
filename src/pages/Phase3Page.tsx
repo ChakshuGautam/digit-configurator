@@ -43,6 +43,14 @@ type Step = 'landing' | 'upload' | 'preview' | 'creating-depts' | 'creating-comp
 export default function Phase3Page() {
   const { completePhase, addUndo, state } = useApp();
   const targetTenant = state.targetTenant || state.tenant;
+  // Common-masters (Department, Designation) and PGR ServiceDefs are
+  // *state-scoped* in DIGIT: schemas are registered at the state root and
+  // data lives there too, with sub-tenants inheriting via MDMS lookup. The
+  // wizard's targetTenant points at the new city ("mz.maputo"), so writing
+  // there fails with SCHEMA_DEFINITION_NOT_FOUND_ERR — mdms-v2 doesn't
+  // auto-resolve schemas up the hierarchy on `_create`. Mirror Phase 1's
+  // parentState derivation and write at the state root instead.
+  const parentState = targetTenant.includes('.') ? targetTenant.split('.')[0] : targetTenant;
   const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>('landing');
@@ -123,10 +131,19 @@ export default function Phase3Page() {
       let desigsCreated = 0;
       let complaintsCreated = 0;
 
+      // Collect per-row failures across all three writes; surface them at the
+      // end so the wizard never paints "Phase 3 Complete!" when 0/N rows
+      // actually landed (the prior behaviour — Phase 3 read `success.length`
+      // and ignored `failed[]`, so a 100%-failed run still showed the green
+      // check). Tenant-scope mismatch (writes at city, schemas at state) was
+      // one path into this; any other per-row failure would have masked too.
+      type RowFailure = { kind: string; code: string; error: string };
+      const allFailures: RowFailure[] = [];
+
       if (departments.length > 0) {
         setProgressMessage('Creating departments...');
         const deptResults = await mdmsService.createDepartments(
-          targetTenant,
+          parentState,
           departments.map(d => ({
             code: d.code,
             name: d.name,
@@ -135,10 +152,13 @@ export default function Phase3Page() {
         );
         deptsCreated = deptResults.success.length;
         setCreatedDepts(deptsCreated);
+        for (const f of deptResults.failed) {
+          allFailures.push({ kind: 'Department', code: f.dept.code, error: f.error });
+        }
 
         // Create localizations for departments
         await localizationService.uploadDepartmentLocalizations(
-          targetTenant,
+          parentState,
           departments.map(d => ({ code: d.code, name: d.name })),
           'en_IN'
         );
@@ -150,7 +170,7 @@ export default function Phase3Page() {
       if (designations.length > 0) {
         setProgressMessage('Creating designations...');
         const desigResults = await mdmsService.createDesignations(
-          targetTenant,
+          parentState,
           designations.map(d => ({
             code: d.code,
             name: d.name,
@@ -161,10 +181,13 @@ export default function Phase3Page() {
         );
         desigsCreated = desigResults.success.length;
         setCreatedDesigs(desigsCreated);
+        for (const f of desigResults.failed) {
+          allFailures.push({ kind: 'Designation', code: f.desig.code, error: f.error });
+        }
 
         // Create localizations for designations
         await localizationService.uploadDesignationLocalizations(
-          targetTenant,
+          parentState,
           designations.map(d => ({ code: d.code, name: d.name })),
           'en_IN'
         );
@@ -182,7 +205,7 @@ export default function Phase3Page() {
       if (complaintTypes.length > 0) {
         setProgressMessage('Creating complaint types...');
         const complaintResults = await mdmsService.createComplaintTypes(
-          targetTenant,
+          parentState,
           complaintTypes.map(ct => ({
             serviceCode: ct.serviceCode,
             name: ct.name,
@@ -194,10 +217,13 @@ export default function Phase3Page() {
         );
         complaintsCreated = complaintResults.success.length;
         setCreatedComplaints(complaintsCreated);
+        for (const f of complaintResults.failed) {
+          allFailures.push({ kind: 'ComplaintType', code: f.type.serviceCode, error: f.error });
+        }
 
         // Create localizations for complaint types
         await localizationService.uploadComplaintTypeLocalizations(
-          targetTenant,
+          parentState,
           complaintTypes.map(ct => ({
             serviceCode: ct.serviceCode,
             name: ct.name,
@@ -209,6 +235,28 @@ export default function Phase3Page() {
       }
 
       addUndo('create_complaints', `Created ${complaintsCreated} complaint types`);
+
+      // If every write failed, treat the phase as failed, not complete.
+      // Partial success still advances (some rows may legitimately collide
+      // on retry); zero success with any rows attempted is the lying-banner
+      // pathology we're fixing.
+      const totalAttempted = departments.length + designations.length + complaintTypes.length;
+      const totalSucceeded = deptsCreated + desigsCreated + complaintsCreated;
+      if (totalAttempted > 0 && totalSucceeded === 0) {
+        const firstError = allFailures[0]?.error ?? 'no rows landed';
+        throw new Error(
+          `Phase 3 wrote 0 of ${totalAttempted} rows. First error: ${firstError}. ` +
+          `Check that the target state (${parentState}) has the relevant schemas registered.`
+        );
+      }
+      if (allFailures.length > 0) {
+        const summary = allFailures
+          .slice(0, 5)
+          .map(f => `${f.kind}/${f.code}: ${f.error}`)
+          .join(' • ');
+        const more = allFailures.length > 5 ? ` (+${allFailures.length - 5} more)` : '';
+        setError(`${totalSucceeded}/${totalAttempted} rows landed. Failures: ${summary}${more}`);
+      }
       setStep('complete');
     } catch (err) {
       console.error('MDMS creation error:', err);
