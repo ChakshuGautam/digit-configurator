@@ -126,27 +126,54 @@ export const localizationService = {
   },
 
   // Create localization for a complaint type.
-  // We emit both the verbatim code and an uppercase variant for back-compat
-  // with consumers that lowercase/uppercase the serviceCode before lookup.
-  // Deduped so an already-uppercase serviceCode doesn't produce two identical
-  // rows — the backend's upsert rejects the whole batch on
-  // core.DUPLICATE_MESSAGE_IDENTITY when it sees the repeat.
+  //
+  // Emits up to four keys per record, deduped:
+  //   1. `SERVICEDEFS.<serviceCode>`        — citizen, exact-case (back-compat)
+  //   2. `SERVICEDEFS.<SERVICECODE>`        — citizen, uppercase (what the
+  //      runtime hooks actually query via `serviceCode.toUpperCase()`)
+  //   3. `SERVICEDEFS.<SERVICECODE>.<DEPT>` — employee form, department-
+  //      qualified. The employee `useServiceDefs` hook builds the key as
+  //      `SERVICEDEFS.<CODE_UPPER>.<DEPT>`; the citizen `getMenu` /
+  //      `getSubMenu` path uses just `SERVICEDEFS.<CODE_UPPER>`. Both must
+  //      resolve or one side renders the raw key (see
+  //      egovernments/Citizen-Complaint-Resolution-System#539).
+  //   4. `SERVICEDEFS.<MENUPATH_UPPER>`     — parent menu label that the
+  //      citizen top-level menu builds via `t("SERVICEDEFS." +
+  //      def.menuPath.toUpperCase())`. Without this a new menuPath renders
+  //      as the raw key in the citizen create flow.
+  //
+  // Deduped because the backend's upsert rejects the whole batch on
+  // core.DUPLICATE_MESSAGE_IDENTITY when it sees a repeat (e.g. an
+  // already-uppercase serviceCode would otherwise emit two identical rows
+  // for keys 1 and 2).
+  //
+  // `name` is the message for the serviceCode keys; `menuPath` (verbatim,
+  // since the operator's display label isn't a separate field) is used
+  // for the parent-menu key.
   buildComplaintTypeLocalizations(
     _tenantId: string,
     serviceCode: string,
     name: string,
-    locale: string = 'en_IN'
+    locale: string = 'en_IN',
+    opts: { department?: string; menuPath?: string } = {}
   ): LocalizationMessage[] {
-    const codes = new Set<string>([
-      `SERVICEDEFS.${serviceCode}`,
-      `SERVICEDEFS.${serviceCode.toUpperCase()}`,
-    ]);
-    return Array.from(codes).map((code) => ({
-      code,
-      message: name,
-      module: 'rainmaker-pgr',
-      locale,
-    }));
+    const messages: LocalizationMessage[] = [];
+    const seen = new Set<string>();
+    const push = (code: string, message: string) => {
+      if (seen.has(code)) return;
+      seen.add(code);
+      messages.push({ code, message, module: 'rainmaker-pgr', locale });
+    };
+
+    push(`SERVICEDEFS.${serviceCode}`, name);
+    push(`SERVICEDEFS.${serviceCode.toUpperCase()}`, name);
+    if (opts.department) {
+      push(`SERVICEDEFS.${serviceCode.toUpperCase()}.${opts.department.toUpperCase()}`, name);
+    }
+    if (opts.menuPath) {
+      push(`SERVICEDEFS.${opts.menuPath.toUpperCase()}`, opts.menuPath);
+    }
+    return messages;
   },
 
   // Create localization for a boundary
@@ -213,14 +240,20 @@ export const localizationService = {
     return this.upsertMessages(tenantId, locale, messages);
   },
 
-  // Upload localizations for all complaint types
+  // Upload localizations for all complaint types. `department` and
+  // `menuPath`, when present on each record, drive the emission of the
+  // dept-qualified and menuPath-parent keys — see
+  // `buildComplaintTypeLocalizations` for the full key list.
   async uploadComplaintTypeLocalizations(
     tenantId: string,
-    types: { serviceCode: string; name: string }[],
+    types: { serviceCode: string; name: string; department?: string; menuPath?: string }[],
     locale: string = 'en_IN'
   ): Promise<{ success: number; failed: number }> {
     const messages = types.flatMap((t) =>
-      this.buildComplaintTypeLocalizations(tenantId, t.serviceCode, t.name, locale)
+      this.buildComplaintTypeLocalizations(tenantId, t.serviceCode, t.name, locale, {
+        department: t.department,
+        menuPath: t.menuPath,
+      })
     );
     return this.upsertMessages(tenantId, locale, messages);
   },

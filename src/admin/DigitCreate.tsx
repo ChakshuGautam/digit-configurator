@@ -43,6 +43,11 @@ export interface DigitCreateProps {
   redirect?: 'list' | 'edit' | 'show' | false;
   /** Optional pre-submit transform (stamp server-required nested fields, etc.) */
   transform?: TransformData;
+  /** Optional post-success side-effect — e.g. seed dependent localization
+   *  rows for the new record. Runs after create succeeds, before the
+   *  redirect. Failures are caught + surfaced as a toast; the redirect
+   *  still fires so the operator isn't stranded on the create form. */
+  afterCreate?: (data: RaRecord) => void | Promise<void>;
 }
 
 function DigitCreateContent({
@@ -115,7 +120,7 @@ function DigitCreateContent({
   );
 }
 
-export function DigitCreate({ title, children, resource, record, redirect = 'list', transform }: DigitCreateProps) {
+export function DigitCreate({ title, children, resource, record, redirect = 'list', transform, afterCreate }: DigitCreateProps) {
   const { info, capture, clear } = useMutationError();
   const contextResource = useResourceContext();
   const redirectTo = useRedirect();
@@ -132,7 +137,7 @@ export function DigitCreate({ title, children, resource, record, redirect = 'lis
       transform={transform}
       mutationOptions={{
         onError: (err) => capture(err),
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
           clear();
           // Without a toast the page silently redirects to list — operators
           // have no way to tell a 200 apart from a quietly-swallowed 500
@@ -142,6 +147,22 @@ export function DigitCreate({ title, children, resource, record, redirect = 'lis
             title: `${prettyResourceSingular(effectiveResource)} created`,
             description: label !== 'Record' ? label : undefined,
           });
+          // Run any per-resource post-create side-effect (e.g. seeding
+          // localization rows for the new record). Errors don't block the
+          // redirect — the record itself was saved successfully, so the
+          // operator should still land on the list view and can re-run
+          // the side-effect manually if needed.
+          if (afterCreate && data) {
+            try {
+              await afterCreate(data as RaRecord);
+            } catch (e) {
+              toast({
+                title: 'Post-create step failed',
+                description: e instanceof Error ? e.message : String(e),
+                variant: 'destructive',
+              });
+            }
+          }
           // Manually fire the redirect since our custom onSuccess swallows
           // ra-core's default redirect side-effect. Without this the form
           // stayed populated after a successful create, leaving operators
