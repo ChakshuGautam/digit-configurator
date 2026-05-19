@@ -788,7 +788,7 @@ export default function Phase4Page() {
               </p>
               <ul className="space-y-1">
                 <li>• HRMS employee record</li>
-                <li>• User account (username: lowercase name)</li>
+                <li>• User account (username: employee code)</li>
                 <li>
                   • Password: <code className="bg-muted px-1 rounded text-xs text-primary">eGov@123</code>
                 </li>
