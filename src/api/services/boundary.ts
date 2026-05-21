@@ -254,6 +254,44 @@ export const boundaryService = {
     }
   },
 
+  // Poll boundary search until the given entity codes are readable. Entity
+  // create is Kafka-backed (returns 200 before the row lands), so this gates
+  // relationship creation on actual visibility. Searches in chunks with an
+  // explicit limit — /boundary/_search defaults to ~50 results even when codes
+  // are supplied, so without the limit the gate undercounts and stalls.
+  async waitForEntityVisibility(
+    tenantId: string,
+    codes: string[],
+    timeoutMs = 120000
+  ): Promise<boolean> {
+    const expected = new Set(codes);
+    if (expected.size === 0) return true;
+    const CHUNK = 100;
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const seen = new Set<string>();
+      for (let i = 0; i < codes.length; i += CHUNK) {
+        const chunk = codes.slice(i, i + CHUNK);
+        try {
+          const qs = `tenantId=${encodeURIComponent(tenantId)}&codes=${chunk
+            .map(encodeURIComponent)
+            .join(',')}&limit=${chunk.length}`;
+          const response = await apiClient.post(`${ENDPOINTS.BOUNDARY_SEARCH}?${qs}`, {
+            RequestInfo: apiClient.buildRequestInfo(),
+          });
+          for (const b of response.Boundary ?? []) {
+            if (expected.has(b.code)) seen.add(b.code);
+          }
+        } catch {
+          // transient — keep polling
+        }
+      }
+      if (seen.size >= expected.size) return true;
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+    return false;
+  },
+
   // Create a single boundary (entity + relationship)
   async createBoundary(boundary: Boundary): Promise<Boundary> {
     // Step 1: Create the boundary entity
@@ -273,7 +311,13 @@ export const boundaryService = {
     return boundary;
   },
 
-  // Create multiple boundaries in order (respecting parent-child relationships)
+  // Create multiple boundaries: ALL entities first → visibility gate →
+  // relationships top-down with retry. Previously this created each boundary's
+  // entity+relationship coupled and sequentially, so children raced their
+  // parent's not-yet-committed entity/relationship, got PARENT_NOT_FOUND, and
+  // were silently dropped — digit-configurator#68, the reason
+  // heal-boundary-relationships.py existed. Separating the passes, gating on
+  // entity visibility, and retrying the residual lag closes that race.
   async createBoundaries(
     boundaries: Boundary[],
     onProgress?: (created: number, total: number) => void
@@ -283,24 +327,68 @@ export const boundaryService = {
   }> {
     const success: Boundary[] = [];
     const failed: { boundary: Boundary; error: string }[] = [];
+    const total = boundaries.length;
+    if (total === 0) return { success, failed };
 
-    // Group boundaries by type/level for ordered creation
+    const tenantId = boundaries[0].tenantId;
     const byLevel = this.groupByLevel(boundaries);
 
-    let created = 0;
+    // Pass 1: create ALL entities first (every level).
+    const failedEntities = new Set<string>();
     for (const levelBoundaries of byLevel) {
-      for (const boundary of levelBoundaries) {
+      for (const b of levelBoundaries) {
         try {
-          const result = await this.createBoundary(boundary);
-          success.push(result);
-          created++;
-          onProgress?.(created, boundaries.length);
+          await this.createBoundaryEntity(b.tenantId, b.code);
         } catch (error) {
+          failedEntities.add(b.code);
           failed.push({
-            boundary,
-            error: error instanceof Error ? error.message : 'Unknown error',
+            boundary: b,
+            error: error instanceof Error ? error.message : 'Unknown error (entity)',
           });
         }
+      }
+    }
+
+    // Gate: wait until the created entities are readable before any relationship.
+    await this.waitForEntityVisibility(
+      tenantId,
+      boundaries.filter((b) => !failedEntities.has(b.code)).map((b) => b.code)
+    );
+
+    // Pass 2: relationships top-down, with bounded retry for residual lag.
+    const MAX_PASSES = 6;
+    let created = 0;
+    for (const levelBoundaries of byLevel) {
+      let pending = levelBoundaries.filter(
+        (b) => !failedEntities.has(b.code) && b.hierarchyType && b.boundaryType
+      );
+      for (let pass = 0; pass < MAX_PASSES && pending.length > 0; pass++) {
+        if (pass > 0) await new Promise((r) => setTimeout(r, 1500 * pass));
+        const stillPending: Boundary[] = [];
+        for (const b of pending) {
+          try {
+            await this.createBoundaryRelationship(
+              b.tenantId,
+              b.hierarchyType as string,
+              b.code,
+              b.boundaryType as string,
+              b.parent
+            );
+            success.push(b);
+            created++;
+            onProgress?.(created, total);
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : 'Unknown error (relationship)';
+            // PARENT_NOT_FOUND / "...does not exist" = visibility lag — re-queue
+            // and retry rather than drop (#68).
+            if (/does not exist|not found|parent/i.test(msg) && pass < MAX_PASSES - 1) {
+              stillPending.push(b);
+            } else {
+              failed.push({ boundary: b, error: msg });
+            }
+          }
+        }
+        pending = stillPending;
       }
     }
 
