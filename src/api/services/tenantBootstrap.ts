@@ -56,6 +56,15 @@ export interface BootstrapProgress {
 // the new tenant (their @PostConstruct init evaluates these).
 const ESSENTIAL_DATA_SCHEMAS = [
   'ACCESSCONTROL-ROLES.roles',
+  // ACCESSCONTROL-ROLEACTIONS + ACCESSCONTROL-ACTIONS-TEST are read on
+  // digit-ui's employee landing — without them, the JSONPath lookup
+  // `MdmsRes.ACCESSCONTROL-ROLEACTIONS.roleactions` throws
+  // PathNotFoundException and the page renders blank. Roles alone aren't
+  // enough; the per-role action mapping (~384 rows from pg) decides what
+  // sidebar/cards each role sees, and the action definitions (~253 rows)
+  // are what those mappings reference by id.
+  'ACCESSCONTROL-ROLEACTIONS.roleactions',
+  'ACCESSCONTROL-ACTIONS-TEST.actions-test',
   'common-masters.IdFormat',
   'common-masters.Department',
   'DataSecurity.DecryptionABAC',
